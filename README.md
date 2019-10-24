@@ -1,5 +1,14 @@
 The pfits software package is developed to process psrfits data files (both search and fold-mode files).
 
+Author: George.Hobbs@csiro.au
+CSIRO 2019
+
+Compile with:
+./bootstrap
+./configure
+make
+make install
+
 Software to write:
 
 1. pfits_describe:
