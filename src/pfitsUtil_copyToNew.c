@@ -15,8 +15,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
-//#include <fitsio.h>
-#include "/home/archivist/processing/software/share/cfitsio_3450/include/fitsio.h"
+#include <fitsio.h>
 
 //void setHeaderInformation(fitsfile *outfptr,char *fname,double *stt_offs_ref);
 //void copyData(fitsfile *outfptr,char *fname,double stt_offs_ref);
