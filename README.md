@@ -1,34 +1,37 @@
-The pfits software package is developed to process psrfits data files (both search and fold-mode files).
+# pfits
 
-Author: George.Hobbs@csiro.au
-CSIRO 2019
+Author:    George.Hobbs@csiro.au  
+Copyright: CSIRO 2019
 
-Compile with:
-./bootstrap
-./configure
-make
+**pfits** is a software package to read, manipulate and process PSRFITS format search- and fold-mode pulsar astronomy data files
+
+## Compile
+./bootstrap  
+./configure  
+make  
 make install
 
-Software to write:
+## Routines
 
-1. pfits_describe:
+### pfits_describe
 
-summarises the header information in a PSRFITS file.  The output can be written to the screen or to a file.
++ summarises the header information in a PSRFITS file
++ The output can be written to the screen or a file
 
-2. pfits_fv:
+### pfits_fv
 
-code that reproduces some of the "fv" (fits viewer) functionality. This code allows the user to obtain detailed information about the psrfits file.
++ code that reproduces some of the "fv" (fits viewer) functionality
++ allows the user to obtain detailed information about the file.
 
-3. pfits_plot:
+### pfits_plot
 
-This code first determines whether the data is search mode or fold mode.
-
-fold mode:
++ determines whether the data is search mode or fold mode
++ for fold mode:
 
 if 1 channel then it plots the profile (with polarisation information if present)
 if multiple channels then it plots of colour scale image for I, Q, U and V (unless just I is requested)
 
-search mode:
++ for search mode:
 
 the user can select a time range, or nsamp range, or subint range. If > N points (where N is typically 4096) then the data gets averaged and the minimum, mean and maximum value in the average is recorded. The following options are available:
 
@@ -38,18 +41,60 @@ the user can select a time range, or nsamp range, or subint range. If > N points
 - plot 4-pol data underneath each other
 - plot frequency-time plots
 
-4. pfits_dedisperse
+### pfits_dedisperse
 
-read in a psrfits search mode file, dedisperses, frequency-sums (if requested) and a new psrfits file is output.  Have the option to output multiple dispersed data files if requested.
++ read in a search mode file, dedisperses, frequency-sums (if requested)
++ a new PSRFITS file is output
++ the option to output multiple dispersed data files if requested
 
-5. pfits_fold
+### pfits_fold
 
-folds a psrfits search mode file with a given pulse period or using a tempo2 predictor.  Outputs a new psrfits fold-mode file
++ folds a search mode file with a given pulse period or using a tempo2 predictor
++ outputs a new PSRFITS fold-mode file
 
-6. pfits_singlepulse
+### pfits_singlepulse
 
-extracts single pulses from a psrfits search mode file.  Can output psrfits fold-mode files for each pulse or calculate various parameters (e.g., flux density) and output those instead.
++ extracts single pulses from a search mode file
++ can output PSRFITS fold-mode files for each pulse or calculate various parameters (e.g., flux density) and output those instead
 
-7. pfits_calibrate
-
+### pfits_makeSpectrum
+### pfitsUtil_copyToNew
+### pfits_addFRB_1bit   
+### pfits_makeTimeMovie
+### pfitsUtil_createFoldTemplate
+### pfits_addFRB
+### pfits_merge
+### pfitsUtil_foldmode_combineFreq
+### pfits_output
+### pfitsUtil_foldmode_combineTime
+### pfits_cal
+### pfitsUtil_foldmode_extractFreq
+### pfits_change
+### pfits_outValues
+### pfitsUtil_foldmode_extractTime
+### pfits_convertText    
+### pfitsUtil_foldmode_useTemplate
+### pfitsUtil_headerInformation
+### pfits_plotfold  
+### pfitsUtil_searchmode_combineFreq
+### pfits_extract1bit
+### pfits_plotsearch           
+### pfitsUtil_searchmode_combineTime
+### pfits_extractImage
+### pfitsUtil_searchmode_extractFreq
+### pfits_fftSearch
+### pfits_pulseExtraction      
+### pfitsUtil_searchMode_extractPart
+### pfits_frb
+### pfits_read_1bitExtraction
+### pfitsUtil_updateMetaData
+### pfits_zapProfile
+### pfits_getZeroDM                 
+### pfits_loader
+### pfits_sim
+### pfits_zapUWL
+### pfits_makeImages
+### pfits_simRealData
+### pfits_makeMovie
+### pfits_statistics
 
