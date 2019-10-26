@@ -1,21 +1,17 @@
 # pfits
-==================== 
+---
 Author:    George.Hobbs@csiro.au  
 Copyright: CSIRO 2019
 
-**pfits** is a software package to read, manipulate and process PSRFITS format search- and fold-mode pulsar astronomy data files 
- 
-
+**pfits** is a software package to read, manipulate and process PSRFITS format search- and fold-mode pulsar astronomy data files
+---
 ## Compile
-==================== 
 ./bootstrap  
 ./configure  
 make  
-make install 
- 
-
+make install
+---
 ## Routines
-==================== 
 
 ### pfits_describe
 
