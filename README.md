@@ -4,7 +4,7 @@ Author:    George.Hobbs@csiro.au
 Copyright: CSIRO 2019
 
 **pfits** is a software package to read, manipulate and process PSRFITS format search- and fold-mode pulsar astronomy data files 
- 
+
 
 ## Compile
 ==================== 
