@@ -7,6 +7,8 @@
 // This software will work with PSRFITS fold mode files and PSRFITS search mode files
 //
 // Version 1: 3rd May 2018, G. Hobbs
+// Version 1.1: 7th December 2018, LT, GH
+// Version 1.2: 27th September 2019, LT (Update OBSFREQ type from TFLOAT to TDOUBLE)
 //
 // gcc -lm -o pfitsUtil_searchmode_combineFreq pfitsUtil_searchmode_combineFreq.c -lcfitsio
 // gcc -lm -o pfitsUtil_searchmode_combineFreq pfitsUtil_searchmode_combineFreq.c -I/pulsar/psr/software/20170525/src/util/anaconda2/include -L../cfitsio/ -L/pulsar/psr/software/20170525/src/util/anaconda2/lib/ -lcfitsio -lcurl -lssl -lcrypto
@@ -18,7 +20,7 @@
 #include "fitsio.h"
 #include <stdint.h>
 
-#define VERSION 1.0
+#define VERSION 1.1
 #define MAX_SUBBANDS 30
 
 int main(int argc,char *argv[])
@@ -56,7 +58,7 @@ int main(int argc,char *argv[])
   int subint_out;
   int initflag=0;
   float bytespersample;
-  float newObsFreq;
+  double newObsFreq;
   long long sizeWriteVals = 0;
   long long writePos;
   char cval[16];
@@ -250,7 +252,7 @@ int main(int argc,char *argv[])
   fits_movabs_hdu(outfptr, 1, NULL, &status);
   printf("Frequency range = %g and %g\n",freqLast,freqFirst);
   newObsFreq = fabs((freqLast + freqFirst)/2.0);
-  fits_update_key(outfptr, TFLOAT, (char *)"OBSFREQ", &newObsFreq, NULL, &status );
+  fits_update_key(outfptr, TDOUBLE, (char *)"OBSFREQ", &newObsFreq, NULL, &status );
 
   fits_movnam_hdu(outfptr, BINARY_TBL,(char *)"SUBINT",0,&status);
   fits_update_key(outfptr, TFLOAT, (char *)"REFFREQ", &newObsFreq, NULL, &status );
