@@ -7,7 +7,7 @@
 // This software will work with PSRFITS fold mode files and PSRFITS search mode files
 //
 // Version 1: 5rd May 2018, G. Hobbs
-// Version 1.1: 5th Dec 2018, G. Hobbs - fixed OFFS_SUB table
+// Version 2: 5th Dec 2018, G. Hobbs - fixed OFFS_SUB table
 //
 // gcc -lm -o pfitsUtil_searchmode_combineTime pfitsUtil_searchmode_combineTime.c -lcfitsio
 //
@@ -19,7 +19,7 @@
 #include "fitsio.h"
 #include <stdint.h>
 
-#define VERSION 1.1
+#define VERSION 1.0
 
 int main(int argc,char *argv[])
 {

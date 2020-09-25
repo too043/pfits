@@ -73,6 +73,9 @@ int main(int argc,char *argv[])
   char csvFile[128];
   int flip=0;
   int stats=0;
+
+  float minVal = 0;
+  float maxVal = 3;
   
   printf("Starting\n");
   
@@ -115,6 +118,10 @@ int main(int argc,char *argv[])
 	publish=2;
       else if (strcmp(argv[i],"-colour")==0)
 	sscanf(argv[++i],"%d",&colourScheme);
+      else if (strcmp(argv[i],"-minVal")==0)
+	sscanf(argv[++i],"%f",&minVal);
+      else if (strcmp(argv[i],"-maxVal")==0)
+	sscanf(argv[++i],"%f",&maxVal);
       else if (strcmp(argv[i],"-stats")==0)
 	stats=1;
       else if (strcmp(argv[i],"-g")==0)
@@ -352,7 +359,7 @@ int main(int argc,char *argv[])
       tr[3] = dSet->head->chanFreq[0];  tr[4] = dSet->head->chanbw;  tr[5] = 0;
 	  
 
-	  cpgimag(plotArrBin,nchan,nTimeSamples/2,1,nchan,1,nTimeSamples/2,0,3,tr);
+	  cpgimag(plotArrBin,nchan,nTimeSamples/2,1,nchan,1,nTimeSamples/2,minVal,maxVal,tr);
 	}
     }
   else
@@ -388,7 +395,7 @@ int main(int argc,char *argv[])
 
       //      cpgctab(heat_l,heat_r,heat_g,heat_b,5,1.0,0.5);
       printf("Using %d %d\n",nchan,nTimeSamples);
-      cpgimag(plotArr,nchan,nTimeSamples,1,nchan,1,nTimeSamples,0,3,tr);
+      cpgimag(plotArr,nchan,nTimeSamples,1,nchan,1,nTimeSamples,minVal,maxVal,tr);
       if (outputSet==1)
 	{
 	  fout = fopen(output,"w");
@@ -453,7 +460,7 @@ int main(int argc,char *argv[])
       cpglab("Time from start of observation (s)","Frequency (MHz)","");
       //      cpgctab(heat_l,heat_r,heat_g,heat_b,5,1.0,0.5);
       printf("Using %d %d\n",nchan,nTimeSamples/2);
-      cpgimag(plotArrBin,nchan,nTimeSamples/2,1,nchan,1,nTimeSamples/2,0,3,tr);
+      cpgimag(plotArrBin,nchan,nTimeSamples/2,1,nchan,1,nTimeSamples/2,minVal,maxVal,tr);
       
       // Overlay FRB analytic signal
       tdiff = 4.15e-3*dm*(pow(fref/1000.0,-2)-pow(dSet->head->chanFreq[0]/1000.0,-2));
@@ -524,7 +531,7 @@ int main(int argc,char *argv[])
       cpglab("Time from start of observation (s)","Frequency (MHz)","");
       //      cpgctab(heat_l,heat_r,heat_g,heat_b,5,1.0,0.5);
       printf("Using %d %d\n",nchan,nTimeSamples);
-      cpgimag(plotArr2,nchan,nDedispSamp,1,nchan,1,nDedispSamp,0,3,tr);
+      cpgimag(plotArr2,nchan,nDedispSamp,1,nchan,1,nDedispSamp,minVal,maxVal,tr);
       
       
       for (i=0;i<nDedispSamp;i++)
@@ -584,7 +591,7 @@ int main(int argc,char *argv[])
   cpglab("Time from start of observation (s)","","");
   //  cpgctab(heat_l,heat_r,heat_g,heat_b,5,1.0,0.5);
   printf("Using %d %d\n",nchan,nTimeSamples);
-  cpgimag(plotArr2,nchan,nDedispSamp/nbin,1,nchan,1,nDedispSamp/nbin,0,3,tr);
+  cpgimag(plotArr2,nchan,nDedispSamp/nbin,1,nchan,1,nDedispSamp/nbin,minVal,maxVal,tr);
 
 
   for (i=0;i<nDedispSamp/nbin;i++)

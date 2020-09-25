@@ -52,7 +52,7 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
   long s0,s1;
   long firstSamp,lastSamp;
   float tsamp;
-  int scount=0;
+  long int scount=0;
   
   nchan = dSet->head->nchan;
   npol  = dSet->head->npol;
@@ -114,8 +114,6 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
 	{
 	  fits_read_col(dSet->fp,TFLOAT,colnum_datoffs,subint+1,1,nchan,&n_fval,datOffs,&initflag,&status);
 	  fits_read_col(dSet->fp,TFLOAT,colnum_datscl,subint+1,1,nchan,&n_fval,datScl,&initflag,&status);
-
-  
   
 	  printf("Reading subint %d\n",subint);
 	  // Read in 1 subint of data for the specified (polNum) polarisation
@@ -128,11 +126,14 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
 	    i1 = lastSamp;
 	  else
 	    i1 = nsblk;
-	  
+	  //	  printf("Loading from %d to %d\n",i0,i1);
 	  for (i=i0;i<i1;i++)
 	    {
+	      //	      printf("Loading %d\n",i);
 	      if (nbits <= 8)
 		{
+		  //		  if (subint==163) printf("a\n");
+		  //		  printf("Reading bytes\n");
 		  fits_read_col_byt(dSet->fp,colnum,
 				    subint+1,
 				    1+i*npol*nchan/samplesperbyte+polNum*nchan/samplesperbyte,
@@ -140,12 +141,22 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
 				    nval,cVals,&initflag,&status);
 		  //		  for (j=0;j<128;j++)
 		  //		    printf("Have loaded %d\n",(int)cVals[j]);
+		  //		  if (subint==163) printf("b %ld\n",scount*nchan);
+
+		  // Issue here if NCHAN from the header isn't the same as the NCHAN passed through in "out"
+		  //		  printf("Converting to floats %d %d %d\n",scount,scount*nchan,samplesperbyte);
 		  pfits_bytesToFloats(samplesperbyte,nchan,cVals,out+scount*nchan);
+		  //		  printf("Done conversion\n");
+		  //		  if (subint==163) printf("c\n");
 		  if (offsScl==1)
 		    {
 		      for (j=0;j<nchan;j++)  // Is this really npol??
-			out[scount*nchan+j]=log10(out[scount*nchan+j]*datScl[j]+datOffs[j]);
+			out[scount*nchan+j]=((out[scount*nchan+j]-dSet->head->zeroOff)*datScl[j])+datOffs[j];
+			//	out[scount*nchan+j]=(out[scount*nchan+j]-datOffs[j])*datScl[j]; //+datOffs[j]);
+			//			out[scount*nchan+j]=(out[scount*nchan+j]*datScl[j]+datOffs[j]);
+			//			out[scount*nchan+j]=log10(out[scount*nchan+j]*datScl[j]+datOffs[j]);
 		    }
+		  //		  if (subint==163) printf("d\n");
 		}
 	      else if (nbits == 16)
 		{
@@ -211,11 +222,10 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
     }
   
   if (debugFlag==1) printf("Leaving pfits_read1pol_float\n"); 
-  printf("Returninh\n");
   *nSamples = scount*nchan;
   *nFreqSamples = nchan;
   *nTimeSamples = scount;
-  printf("Loaded %d\n",*nTimeSamples);
+  //  printf("Loaded %d\n",*nTimeSamples);
 }
 
 /*
@@ -435,18 +445,23 @@ void twoBitsFloat(int eight_bit_number, float *results, int *index)
 
   for (i = 0; i < 4; i++) {
     int andedNumber = eight_bit_number & 3;
+
     switch (andedNumber) {
     case 0:
-      tempResults[i] = 0; //-2.5;
+      //      tempResults[i] = 0; //-2.5;
+      tempResults[i] = -2.5;
       break;
     case 1:
-      tempResults[i] = 1; // -0.5;
+      //      tempResults[i] = 1; // -0.5;
+      tempResults[i] = -0.5;      
       break;
     case 2:
-      tempResults[i] = 2; //0.5;
+      tempResults[i] = 0.5;
+      //      tempResults[i] = 2; //0.5;
       break;
     case 3:
-      tempResults[i] = 3; // 2.5;
+      tempResults[i] = 2.5;
+      //      tempResults[i] = 3; // 2.5;
       break;
     }
     eight_bit_number = eight_bit_number >> 2;
@@ -456,7 +471,6 @@ void twoBitsFloat(int eight_bit_number, float *results, int *index)
     {
       //      printf("Have %f\n",tempResults[i]);
       results[(*index)++] = tempResults[i];
-      //      printf("ret: %d %g\n",(*index),tempResults[i]);
     }
 }
 

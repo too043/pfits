@@ -307,8 +307,8 @@ int main(int argc,char *argv[])
 	  // Check from 2385 to 2395 as clean bands near WiFi
 	  // and 2401 to 2495 as WiFi bands.
 	  // Wipe those if needed
-	  // GOT TO HERE
-
+	  // NOT DONE YET ***
+	  
 	  //
 	  // Zap band edges because of critically sampled filterbank
 	  //

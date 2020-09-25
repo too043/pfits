@@ -75,36 +75,49 @@ void drawColourMap(dSetStruct *dSet,int pol)
   
   char  plotStr[1024];
   float plot_minX,plot_minY,plot_maxX,plot_maxY;
-  int nsblk=4096;
+  int nsblk=8192;
   long int nSamples;
   int nTimeSamples;
   int nFreqSamples;
-
-  plotArr = (float *)malloc(sizeof(float)*nchan*nsblk);
-  pfits_read1pol_float(plotArr,0,dSet,0,0,1,&nSamples,&nTimeSamples,&nFreqSamples,debug,0);  
+  long nplot=0;
+  int dt = 64; // This is the offset in samples
+  long tmax = 5*8192;
+  long plotPts=2048;
+  int s0=420;
+  int s1=430;
+  printf("nchan = %d\n",nchan);
+  
+  plotArr = (float *)malloc(sizeof(float)*nchan*nsblk*((s1-s0)+1));
+  pfits_read1pol_float(plotArr,0,dSet,s0,s1,2,&nSamples,&nTimeSamples,&nFreqSamples,debug,0);
+  printf("Loaded %d time samples\n",nTimeSamples);
   //  pfits_read1pol_float(plotArr[j],0,dSet[j],subintCount,subintCount,1,&nSamples,&nTimeSamples,&nFreqSamples,debug,0);
-  tr[0] = 0;  tr[1] = 0;  tr[2] = 1;
-  tr[3] = 0;  tr[4] = 1;  tr[5] = 0;
+  tr[0] = 0;  tr[1] = 0;  tr[2] = dSet->head->tsamp;
+  tr[3] = dSet->head->chanFreq[0];  tr[4] = dSet->head->chanbw;  tr[5] = 0;
 
-  for (timeOff=0;timeOff<500;timeOff++)
+  for (timeOff=0;timeOff<tmax;timeOff+=dt)
     {
       printf("Timeoff = %d\n",timeOff);
-      sprintf(plotStr,"plot%5.5d.png/png",timeOff);
+      sprintf(plotStr,"plot%5.5d.png/png",nplot);
       
       cpgbeg(0,plotStr,1,1);
       cpgask(0);
       cpgctab(heat_l,heat_r,heat_g,heat_b,5,1.0,0.5);
       
-      plot_minX=timeOff*3;
-      plot_maxX=timeOff*3+128;
+      //      plot_minX=timeOff*3;
+      //      plot_maxX=timeOff*3+128;
+      plot_minX=timeOff*dSet->head->tsamp;
+      plot_maxX=(timeOff+plotPts)*dSet->head->tsamp;
 
-      plot_minY=0;
-      plot_maxY=96;
+      plot_minY=dSet->head->chanFreq[0];
+      //      plot_maxY=96;
+      plot_maxY=dSet->head->chanFreq[nchan-1];
       
       cpgenv(plot_minX,plot_maxX,plot_minY,plot_maxY,0,1);
-      cpglab("Time (samples)","Frequency (channel)","");
-      cpgimag(plotArr,nchan,nsblk,1,nchan,1,nsblk,0,1,tr);
-      
+      cpglab("Time (seconds)","Frequency (channel)","");
+      //      cpgimag(plotArr,nchan,nsblk,1,nchan,1,nsblk,0,1,tr);
+      //      cpgimag(plotArr,nchan,nTimeSamples,1,nchan,1,nTimeSamples,-2.5,2.5,tr);
+      cpggray(plotArr,nchan,nTimeSamples,1,nchan,1,nTimeSamples,0,1,tr);
+      nplot++;
     }
   free(plotArr);
 }

@@ -1,16 +1,4 @@
-// Code to extract one or more frequency bands from a specified PSRFITS search mode file
-// gcc -lm -o pfitsUtil_searchmode_extractFreq pfitsUtil_searchmode_extractFreq.c -lcfitsio
-
-
-
-// Note:
-// This code is horrible.  The reason is that if I simply copy the original file and then
-// try and shrink the file to remove the channels that I don't want then cfitsio still allocates
-// enough memory for the original file (which can be enormous).
-//
-// This code is me attempting to circumvent cfitsio memory allocation and there is possibly
-// a much better way to do this.
-//
+// gcc -lm -o pfitsUtil_searchmode_filter pfitsUtil_searchmode_filter.c -lcfitsio
 
 #include <stdio.h>
 #include <string.h>
@@ -25,18 +13,14 @@ int main(int argc,char *argv[])
 {
   fitsfile *infptr,*outfptr;
   int status=0;
-  int i,j,k,k0;
+  int i,j,k,k0,ii,jj;
   int hdu=1;
   char inname[1024]; 
   char outname[1024];
   char usename[1024];
   char keyname[128],val[128],comment[128];
   int nchan,npol,nsblk,nsubint,nbit;
-  int outChan1 = 10;
-  int outChan2 = 2000;
-  int newNchan;
-  float newBW;
-  char nullVal = 0;
+  unsigned char nullVal = 0;
   float nullVal_f = 0;
   int initflag=0;
   
@@ -51,8 +35,8 @@ int main(int argc,char *argv[])
   int colnum_out_datOffs=0;
   int colnum_in_datOffs=0;
   
-  char *dataIn;
-  char *dataOut;
+  unsigned char *dataIn;
+  unsigned char *dataOut;
   float *colArrayIn;
   float *colArrayOut;
   
@@ -83,40 +67,40 @@ int main(int argc,char *argv[])
   int keytype;
   int oldBytes;
 
-  float freq1,freq2;
-  int   setFreq=0;
   int   samplesperbyte=1;
+
+  int opol=-1;
+  int outNpol;
+  int outNbits;
+  
+  int setFilterHigh=0;
+  int filterHighBound;
+  int ival;
+
+  int outSamplesPerByte=1;
+  int obit = -1;
   
   printf("Running pfitsUtil_searchmode_extractFreq\n");
   
   for (i=1;i<argc;i++)
     {
-      if (strcmp(argv[i],"-f")==0) // input file
+      if (strcmp(argv[i],"-f")==0)       // input file
 	strcpy(inname,argv[++i]);
-      else if (strcmp(argv[i],"-o")==0) // output file
+      else if (strcmp(argv[i],"-o")==0)  // output file
 	strcpy(outname,argv[++i]);
-      else if (strcmp(argv[i],"-c1")==0) // First channel number for output
-	sscanf(argv[++i],"%d",&outChan1);
-      else if (strcmp(argv[i],"-c2")==0) // Last channel number for output
-	sscanf(argv[++i],"%d",&outChan2);
-      else if (strcmp(argv[i],"-f1")==0) 
+      else if (strcmp(argv[i],"-op")==0) // output number of polarisation
+	sscanf(argv[++i],"%d",&opol);
+      else if (strcmp(argv[i],"-fh")==0) // filter high
 	{
-	  sscanf(argv[++i],"%f",&freq1);
-	  setFreq=1;
+	  setFilterHigh = 1;
+	  sscanf(argv[++i],"%d",&filterHighBound);
 	}
-      else if (strcmp(argv[i],"-f2")==0) 
-	sscanf(argv[++i],"%f",&freq2);
-    }
-
-  if (setFreq==0)
-    {
-      if (outChan1 < outChan2)
-	newNchan= outChan2-outChan1+1;
-      else
-	newNchan= outChan1-outChan2+1;
+      else if (strcmp(argv[i],"-ob")==0) // Output number of bits
+	sscanf(argv[++i],"%d",&obit);
     }
 
   sprintf(usename,"!%s",outname,inname);
+
   if ( !fits_open_file(&infptr, inname, READONLY, &status) )
     {
       fits_movnam_hdu(infptr,BINARY_TBL,(char *)"SUBINT",0,&status);
@@ -130,58 +114,29 @@ int main(int argc,char *argv[])
       samplesperbyte = 8/nbit;
       printf("samplesperbyte = %d\n",samplesperbyte);
       printf("npol = %d\n",npol);
-      //      if ((npol != 1 || nbit != 8) && (npol != 1 || nbit != 2) && (npol != 4 || nbit != 8))
-      //	{
-      //	  printf("Sorry - I can only work with (1 pol and 8 bit) or (1 pol and 2 bit) data or (4 pol and 8 bit) data at the moment\n");
-      //	  exit(1);
-      //	}
+      if ((npol != 1 || nbit != 8) && (npol != 1 || nbit != 2) && (npol != 4 || nbit != 8))
+	{
+	  printf("Sorry - I can only work with (1 pol and 8 bit) or (1 pol and 2 bit) data or (4 pol and 8 bit) data at the moment\n");
+	  exit(1);
+	}
+      if (opol==-1)
+	  outNpol = npol;
+      else
+	outNpol = opol;
 
+      if (obit==-1)
+	outSamplesPerByte = samplesperbyte;
+      else
+	outSamplesPerByte = 8/obit;
+
+      outNbits = 8/outSamplesPerByte;
+      
       fits_get_colnum(infptr, CASEINSEN, "DATA", &colnum_data_in, &status);
       fits_get_colnum(infptr, CASEINSEN, "DAT_FREQ", &colnum_in_datFreq, &status);  
       fits_get_colnum(infptr, CASEINSEN, "DAT_WTS", &colnum_in_datWts, &status);  
       fits_get_colnum(infptr, CASEINSEN, "DAT_SCL", &colnum_in_datScl, &status);  
       fits_get_colnum(infptr, CASEINSEN, "DAT_OFFS", &colnum_in_datOffs, &status);  
 
-      if (setFreq==1)
-	{
-	  float *freq;
-	  
-	  freq = (float *)malloc(sizeof(float)*nchan);
-	  fits_read_col(infptr,TFLOAT,colnum_in_datFreq,1,1,nchan,&nullVal_f,freq,&initflag,&status);
-	  if (freq[0] < freq[1])
-	    {
-	      for (i=0;i<nchan-1;i++)
-		{
-		  if (freq1 > freq[i] && freq1 <= freq[i+1])
-		    outChan1 = i;
-		  if (freq2 > freq[i] && freq2 <= freq[i+1])
-		    outChan2 = i;
-		}
-	      newNchan= outChan2-outChan1; // +1 ?
-	    }
-	  else
-	    {
-	      printf("Band inverted\n");
-	      if (freq1 < freq2)
-		{
-		  double temp;
-		  temp = freq2;
-		  freq2 = freq1;
-		  freq1 = temp;
-		}
-	      for (i=0;i<nchan-1;i++)
-		{
-		  if (freq1 < freq[i] && freq1 >= freq[i+1])
-		    outChan1 = i;
-		  if (freq2 < freq[i] && freq2 >= freq[i+1])
-		    outChan2 = i;
-		}
-	      newNchan= outChan2-outChan1; // +1;
-	      
-	    }
-	      printf("New channels from %g to %g are %d to %d and number of channels = %d\n",freq1,freq2,outChan1,outChan2,newNchan);
-	  free(freq);
-	}
     
       sprintf(checkName1,"TFORM%d",colnum_data_in);
       sprintf(checkName2,"TDIM%d",colnum_data_in);
@@ -191,10 +146,10 @@ int main(int argc,char *argv[])
       sprintf(checkName6,"TFORM%d",colnum_in_datScl);
 
       fits_movabs_hdu(infptr,1,NULL,&status);
-      dataIn = (char *)malloc(sizeof(char)*nchan*nsblk*npol);
-      dataOut = (char *)malloc(sizeof(char)*newNchan*nsblk*npol);
+      dataIn = (unsigned char *)malloc(sizeof(unsigned char)*nchan*nsblk*npol);
+      dataOut = (unsigned char *)malloc(sizeof(unsigned char)*nchan*nsblk*outNpol); 
       colArrayIn = (float *)malloc(sizeof(float)*nchan*npol);
-      colArrayOut = (float *)malloc(sizeof(float)*newNchan*npol);
+      colArrayOut = (float *)malloc(sizeof(float)*nchan*outNpol);
 
       printf("Status before creating new file = %d\n",status);
       
@@ -231,7 +186,7 @@ int main(int argc,char *argv[])
 		   		    		      
   		      if (strcmp(key,checkName1)==0)
 			{
-			  sprintf(newVal,"%dB",newNchan*npol*nsblk/samplesperbyte); 
+			  sprintf(newVal,"%dB",nchan*outNpol*nsblk/outSamplesPerByte); 
 
 			  strcpy(newcard,key);
 			  strcat(newcard," = ");
@@ -246,7 +201,7 @@ int main(int argc,char *argv[])
 			}
 		      else if (strcmp(key,checkName2)==0) // TDIM
 			{
-			  sprintf(newVal,"(%d,%d,%d)",newNchan/samplesperbyte,npol,nsblk);
+			  sprintf(newVal,"(%d,%d,%d)",nchan/outSamplesPerByte,outNpol,nsblk);
 			  
 			  strcpy(newcard,key);
 			  strcat(newcard," = ");
@@ -261,7 +216,7 @@ int main(int argc,char *argv[])
 			}
 		      else if (strcmp(key,checkName3)==0) // DAT_FREQ
 			{
-			  sprintf(newVal,"%dD",newNchan*npol); // THIS SHOULD NOT BE NPOL -- A MISTAKE IN UWL PSRFITS?
+			  sprintf(newVal,"%dD",nchan*outNpol); // THIS SHOULD NOT BE NPOL -- A MISTAKE IN UWL PSRFITS?
 
 			  strcpy(newcard,key);
 			  strcat(newcard," = ");
@@ -276,7 +231,7 @@ int main(int argc,char *argv[])
 			}
 		      else if (strcmp(key,checkName4)==0) // DAT_WTS
 			{
-			  sprintf(newVal,"%dE",newNchan*npol); // THIS SHOULD NOT BE NPOL -- A MISTAKE IN UWL PSRFITS?
+			  sprintf(newVal,"%dE",nchan*outNpol); // THIS SHOULD NOT BE NPOL -- A MISTAKE IN UWL PSRFITS?
 
 			  strcpy(newcard,key);
 			  strcat(newcard," = ");
@@ -291,7 +246,7 @@ int main(int argc,char *argv[])
 			}
 		      else if  (strcmp(key,checkName5)==0 || strcmp(key,checkName6)==0) // DAT_OFFS,DAT_SCL
 			{
-			  sprintf(newVal,"%dE",newNchan*npol);
+			  sprintf(newVal,"%dE",nchan*outNpol);
 
 			  strcpy(newcard,key);
 			  strcat(newcard," = ");
@@ -318,10 +273,10 @@ int main(int argc,char *argv[])
 			    - nchan*4  * npol // DAT_WTS (FLOAT) (the npol is wrong, but seems to be needed in current PSRFITS from UWL)
 			    - nchan*npol*2*4 // DAT_OFFS/DAT_SCLS (FLOAT)
 			    - nchan*1*8 * npol  // DAT_FREQ (DOUBLE) (the npol is wrong, but seems to be needed in current PSRFITS from UWL)
-			    + newNchan*npol*nsblk/samplesperbyte
-			    + newNchan*4 * npol // (the npol is wrong, but seems to be needed in current PSRFITS from UWL)
-			    + newNchan*npol*2*4
-			    + newNchan*1*8 * npol; // (the npol is wrong, but seems to be needed in current PSRFITS from UWL) 
+			    + nchan*outNpol*nsblk/outSamplesPerByte
+			    + nchan*4 * outNpol // (the npol is wrong, but seems to be needed in current PSRFITS from UWL)
+			    + nchan*outNpol*2*4
+			    + nchan*1*8 * outNpol; // (the npol is wrong, but seems to be needed in current PSRFITS from UWL) 
 
 			  printf("oldBytes = %d (%d) [%d] %d %d\n",oldBytes,nchan,newBytes,sizeof(float),sizeof(double));
 			  //			  printf("sizeof = %d %d\n",sizeof(float),sizeof(double));
@@ -343,8 +298,8 @@ int main(int argc,char *argv[])
 		      if (status) {fits_report_error(stderr, status); exit(1);}
 		      if (strcmp(key,checkName2)==0) // TDIM
 			{
-			  printf("Doing the change %d (%d)\n",status,newNchan*npol*nsblk/samplesperbyte);
-			  fits_modify_vector_len(outfptr,colnum_data_in,(long)((long)(newNchan)*(long)npol*(long)nsblk/samplesperbyte),&status); 
+			  printf("Doing the change %d (%d)\n",status,nchan*npol*nsblk/outSamplesPerByte);
+			  fits_modify_vector_len(outfptr,colnum_data_in,(long)((long)(nchan)*(long)outNpol*(long)nsblk/outSamplesPerByte),&status); 
 			  printf("Status = %d\n",status);
 			}
 		    }
@@ -359,6 +314,7 @@ int main(int argc,char *argv[])
 	}
       if (status == END_OF_FILE) status = 0;	  
     }
+
   fits_movnam_hdu(outfptr,BINARY_TBL,(char *)"SUBINT",0,&status);
   printf("Status = %d\n",status);
   fits_movnam_hdu(infptr,BINARY_TBL,(char *)"SUBINT",0,&status);
@@ -376,59 +332,75 @@ int main(int argc,char *argv[])
     {
       printf("Processing sub-integration %d of %d (status = %d)\n",i+1,nsubint,status);
       fits_read_col(infptr,TBYTE,colnum_data_in,i+1,1,nsblk*nchan*npol/samplesperbyte,&nullVal,dataIn,&initflag,&status);
-      for (k=0;k<npol;k++)
+      for (k=0;k<outNpol;k++)
 	{
 	  for (j=0;j<nsblk;j++)
 	    {
-	      writePos = (k*newNchan+j*npol*newNchan)/samplesperbyte; 
-	      readPos = (j*npol*nchan+k*nchan+outChan1)/samplesperbyte;
-	      memcpy(dataOut+writePos,dataIn+readPos,newNchan/samplesperbyte);  
+	      writePos = (k*nchan+j*outNpol*nchan)/outSamplesPerByte; 
+	      readPos = (j*npol*nchan+k*nchan)/samplesperbyte;
+
+	      // Should not do this is outSamplesPerByte != samplesperbyte
+	      if (outSamplesPerByte == samplesperbyte)
+		{
+		  memcpy(dataOut+writePos,dataIn+readPos,nchan/samplesperbyte);  
+		  if (setFilterHigh==1 && samplesperbyte==1)
+		    {
+		      for (ii=0;ii<nchan;ii++)
+			{
+			  ival = (int)dataOut[writePos+ii];
+			  
+			  if (dataOut[writePos+ii] > filterHighBound)
+			    dataOut[writePos+ii] =  filterHighBound;
+			}
+		    }
+		}
+	      else
+		{
+		  unsigned char tc;
+		  long n = 0;
+		  int jj;
+		  double bit_level = 127.5; // Should set carefully
+		  
+		  for (ii=0;ii<nchan/outSamplesPerByte;ii++)
+		    {
+		      tc=0;
+		      for (jj=0;jj<8;jj++)
+			{
+			  if (dataIn[n+readPos] > bit_level)
+			    tc = tc | (1 << (7-jj));
+			  n++;
+			}
+		      dataOut[writePos+ii] = tc;
+		    }
+		}		  
 	    }
 	}
-
-      fits_write_col(outfptr,TBYTE,colnum_data_out,i+1,1,newNchan*nsblk*npol/samplesperbyte,dataOut,&status);
+      fits_write_col(outfptr,TBYTE,colnum_data_out,i+1,1,nchan*nsblk*outNpol/outSamplesPerByte,dataOut,&status);
       fits_read_col(infptr,TFLOAT,colnum_in_datFreq,i+1,1,nchan,&nullVal_f,colArrayIn,&initflag,&status);
-
-      // Calculate central frequency
-      // Seemingly we need to modify OBS_FREQ in the header to get
-      // dspsr and pav to show the correct frequencies even though the
-      // frequencies are correct in the SUBINT table
-      meanFreq=0;
-      for (j=0;j<newNchan;j++)
-	meanFreq+=colArrayIn[outChan1+j];
-      meanFreq/=(double)newNchan;
-      newBW = fabs(colArrayIn[outChan1]-colArrayIn[outChan1+newNchan-1]);
-      
-      fits_write_col(outfptr,TFLOAT,colnum_out_datFreq,i+1,1,newNchan,colArrayIn+outChan1,&status);
-
+      fits_write_col(outfptr,TFLOAT,colnum_out_datFreq,i+1,1,nchan,colArrayIn,&status);
       fits_read_col(infptr,TFLOAT,colnum_in_datWts,i+1,1,nchan,&nullVal_f,colArrayIn,&initflag,&status);
-      fits_write_col(outfptr,TFLOAT,colnum_out_datWts,i+1,1,newNchan,colArrayIn+outChan1,&status);
-
-      fits_read_col(infptr,TFLOAT,colnum_in_datScl,i+1,1,nchan*npol,&nullVal_f,colArrayIn,&initflag,&status);
-      for (j=0;j<npol;j++)
+      fits_write_col(outfptr,TFLOAT,colnum_out_datWts,i+1,1,nchan,colArrayIn,&status);
+      fits_read_col(infptr,TFLOAT,colnum_in_datScl,i+1,1,nchan*outNpol,&nullVal_f,colArrayIn,&initflag,&status);
+      for (j=0;j<outNpol;j++)
 	{
-	  for (k=0;k<newNchan;k++)
-	    colArrayOut[j*newNchan+k] = colArrayIn[j*nchan+k+outChan1];	    
+	  for (k=0;k<nchan;k++)
+	    colArrayOut[j*nchan+k] = colArrayIn[j*nchan+k];	    
 	}
-      fits_write_col(outfptr,TFLOAT,colnum_out_datScl,i+1,1,newNchan*npol,colArrayOut,&status);
-    
-      fits_read_col(infptr,TFLOAT,colnum_in_datOffs,i+1,1,nchan*npol,&nullVal_f,colArrayIn,&initflag,&status);
-      for (j=0;j<npol;j++)
+      fits_write_col(outfptr,TFLOAT,colnum_out_datScl,i+1,1,nchan*outNpol,colArrayOut,&status);
+      fits_read_col(infptr,TFLOAT,colnum_in_datOffs,i+1,1,nchan*outNpol,&nullVal_f,colArrayIn,&initflag,&status);
+      for (j=0;j<outNpol;j++)
 	{
-	  for (k=0;k<newNchan;k++)
-	    colArrayOut[j*newNchan+k] = colArrayIn[j*nchan+k+outChan1];	    
+	  for (k=0;k<nchan;k++)
+	    colArrayOut[j*nchan+k] = colArrayIn[j*nchan+k];	    
 	}
-      fits_write_col(outfptr,TFLOAT,colnum_out_datOffs,i+1,1,newNchan*npol,colArrayOut,&status);
+      fits_write_col(outfptr,TFLOAT,colnum_out_datOffs,i+1,1,nchan*outNpol,colArrayOut,&status);
     }
+  fits_update_key(outfptr, TINT, (char *)"NPOL", &outNpol, NULL, &status );
+  fits_update_key(outfptr, TINT, (char *)"NBITS", &outNbits, NULL, &status );    
   if (status) {fits_report_error(stderr, status); exit(1);}
-  fits_update_key(outfptr, TINT, (char *)"NCHAN", &newNchan, NULL, &status );    
-  fits_update_key(outfptr, TFLOAT, (char *)"REFFREQ", &meanFreq, NULL, &status );
   if (status) {fits_report_error(stderr, status); exit(1);}
   // Back to primary header
   fits_movabs_hdu(outfptr,1,NULL,&status);
-  fits_update_key(outfptr, TFLOAT, (char *)"OBSFREQ", &meanFreq, NULL, &status );
-  fits_update_key(outfptr, TFLOAT, (char *)"OBSBW", &newBW, NULL, &status );
-  fits_update_key(outfptr, TINT, (char *)"OBSNCHAN", &newNchan, NULL, &status );    
   if (status) {fits_report_error(stderr, status); exit(1);}
   
   free(dataIn);

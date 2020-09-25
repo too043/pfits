@@ -1,578 +1,826 @@
+//  Copyright (C) 2015,2016 George Hobbs
+// This file is part of the pfits software package
 //
+
+/* pfits is free software: you can redistribute it and/or modify 
+ * it under the terms of the GNU General Public License as published by 
+ * the Free Software Foundation, either version 3 of the License, or 
+ * (at your option) any later version. 
+ * pfits is distributed in the hope that it will be useful, 
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+ * GNU General Public License for more details. 
+ * You should have received a copy of the GNU General Public License 
+ * along with pfits.  If not, see <http://www.gnu.org/licenses/>. 
+*/
+
+//  gcc -lm -o pfits_plot pfits_plot.c pfits_setup.c pfits_loader.c -I/Users/hob044/hob044/software/cfitsio/include/ -L/Users/hob044/hob044/software/cfitsio/lib -lcfitsio -lcpgplot -lpgplot
+//gcc -lm -o pfits_plot pfits_plot.c pfits_setup.c -I/Users/hob044/hob044/software/cfitsio/include/ -L/Users/hob044/hob044/software/cfitsio/lib -lcfitsio 
+
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <math.h>
+#include <string.h>
+#include <stdlib.h>
 #include "pfits.h"
 #include <cpgplot.h>
 
-#define MAX_RET 4096
+typedef struct plotStruct {
+  int freqTimeRes;  // resolution for frequency-time plots
+  float t1,t2;      // Time range
+  int rangeType;    // 1 = single subint, 2 = subint ranges, 3 = time range from start of observation
+  float minVal;     // Minimum value
+  float maxVal;     // Maximum value
+  float minx,maxx;  // Plot ranges
+  float miny,maxy;
+  float ominx,omaxx;
+  float ominy,omaxy;
 
-void plotFrequency(fitsfile *fp,dSet *d,float mint,float maxt);
-void plotBpass(float *arr,int nchan,int npts);
-void draw_histogram(float *x,int count,int nbin,float minx,float maxx,int normalise,float maxy,int colour,int log,float offset,int histOutput);
+  int windowNum;    // PGPLOT window number
+  int xpanelNum;    // PGPLOT panel number (x)
+  int ypanelNum;    // PGPLOT panel number (y)
+  int colourPlot;   // Colour plot (1 = colour, -1 = grayscale)
 
-void help()
-{
-  printf("-dm <dm>      set the dispersion measure\n");
-  printf("-f filename   PSRFITS file name\n");
-  printf("-g gr         set graphics device\n");
-  printf("-t1 <start>   start time in seconds from beginning of observation\n");
-  printf("-t2 <end>     end time in seconds from beginning of observation\n");
-  printf("\n\n\n");
-}
+  int xPlotType;    // 1 = sample number, 2 = time from start of observation
+  long nSamples;  
+  int nTimeSamples;      // Number of points
+  int nFrequencySamples; // Number of frequency samples
+  int polPlot;      // 1 = different pols on different panels. 2 = different pols on same panel (p1,p2,p3,p4)
+} plotStruct;
+
+void doPlot(dSetStruct **dSet,int nFiles,plotStruct **plot,int debug,int offScl);
+void initialisePlot(plotStruct *plot);
+void loadPlotData(int nFiles,float **plotArr_p0,float **plotArr_p1,float **plotArr_p2,float **plotArr_p3,plotStruct **plot,dSetStruct **dSet,int debug,int offScl);
+void setMinMaxVals(dSetStruct **dSet,plotStruct **plot,int nFiles,int nchan,int nsblk,float **plotArr_p0,float **plotArr_p1,float **plotArr_p2,float **plotArr_p3);
+void drawPlot(int nFiles,int fileNum,int pol,dSetStruct **dSet,plotStruct **plot,float **plotArr_p0,
+	      float **plotArr_p1,float **plotarr_p2,float **plotArr_p3);
+void drawColourMap(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
+		   float *plotArr_p1,float *plotArr_p2,float *plotArr_p3);
+void drawLinePlot(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
+		  float *plotArr_p1,float *plotArr_p2,float *plotArr_p3);
+
 
 int main(int argc,char *argv[])
 {
+  dSetStruct **dSet;
+  int debug=0;
   int i;
-  char fname[128];
-  dSet *data; 
-  float freq,bw,chanbw;
-  int nchan,npol;
-  float mx,my,mx2,my2;
-  float binw;
-  float mean[MAX_RET];
-  float min[MAX_RET];
-  float max[MAX_RET];
-
-  float omean[MAX_RET]; // Original values
-  float omin[MAX_RET];
-  float omax[MAX_RET];
-  long onp,osamp1,osamp2;
-
-  float fx[MAX_RET];
-  float dm=0;
-  int np;
-  long samp1 = -1;
-  long samp2 = -1;
-  float minx,maxx,miny=-1,maxy=260;
-  int nsmooth,onsmooth;
-  int findXrange=1;
-  int findYrange=1;
-  int plotSubint=-1;
-  float ts=-1,te=-1;
-  char key;
-  char grDev[128]="1/xs";
-  int interactive=1;
-  int stopit=0;
-  fitsfile *fp;
-  float tx[2],ty[2];
-
-  help();
+  int nFiles=0,nFiles_t=0;
+  plotStruct **plot;
+  float sval=-1;
+  float t1=-1,t2=-1;
+  float s1=-1,s2=-1;
+  int offScl=0;
   
-
-
-  data = initialiseDset();
-
+  // Count number of files
   for (i=0;i<argc;i++)
     {
       if (strcmp(argv[i],"-f")==0)
-	strcpy(fname,argv[++i]);
-      else if (strcmp(argv[i],"-g")==0)
-	{
-	  strcpy(grDev,argv[++i]);
-	  interactive=0;
-	}
-      else if (strcmp(argv[i],"-t1")==0)
-	sscanf(argv[++i],"%f",&ts);
-      else if (strcmp(argv[i],"-t2")==0)
-	sscanf(argv[++i],"%f",&te);
-      else if (strcmp(argv[i],"-dm")==0)
-	sscanf(argv[++i],"%f",&dm);
-      else if (strcmp(argv[i],"-stop")==0)
-	stopit=1;
+	nFiles++;
+      else if (strcmp(argv[i],"-scale")==0)
+	offScl=1;
+    }
+
+
+  plot = (plotStruct **)malloc(sizeof(plotStruct *)*nFiles);
+  for (i=0;i<nFiles;i++)
+    {
+      plot[i] = (plotStruct *)malloc(sizeof(plotStruct));
+      initialisePlot(plot[i]);
     }
   
-  fp   = openFitsFile(fname); 
-  loadPrimaryHeader(fp,data);
-  displayHeaderInfo(data);
-  if (ts!=-1)
-    samp1 = ts/data->phead.tsamp;
-  if (te!=-1)
-    samp2 = te/data->phead.tsamp;
-
-  if (samp1==-1) samp1=0;
-  if (samp2==-1) samp2=data->phead.nsub*data->phead.nsblk; 
-
-  if (dm==0)
-    np = extractDataZeroDM(fp,data,samp1,samp2,mean,min,max,MAX_RET,&nsmooth);
-  else
-    np = extractData(fp,data,samp1,samp2,mean,min,max,MAX_RET,&nsmooth,dm);
-
-  if (stopit==1)
-    exit(1);
-  cpgbeg(0,grDev,1,1);
-  cpgask(0);
-  //    exit(1);
-  printf("np = %d\n",np);
-  for (i=0;i<np;i++)
+  // Allocate memory for these files
+  dSet = (dSetStruct **)malloc(sizeof(dSetStruct *)*nFiles);
+  
+  // Initialise everything
+  for (i=0;i<nFiles;i++) initialise(&(dSet[i]),debug);
+  
+  // Read inputs
+  for (i=0;i<argc;i++)
     {
-      omean[i] = mean[i];
-      omin[i]  = min[i];
-      omax[i]  = max[i];
+      if (strcmp(argv[i],"-f")==0)       setFilename(argv[++i],dSet[nFiles_t++],debug);
+      else if (strcmp(argv[i],"-s")==0)  sscanf(argv[++i],"%f",&sval);
+      else if (strcmp(argv[i],"-s1")==0) sscanf(argv[++i],"%f",&s1);
+      else if (strcmp(argv[i],"-s2")==0) sscanf(argv[++i],"%f",&s2);
+      else if (strcmp(argv[i],"-t1")==0) sscanf(argv[++i],"%f",&t1);
+      else if (strcmp(argv[i],"-t2")==0) sscanf(argv[++i],"%f",&t2);
     }
-  onsmooth = nsmooth;
-  onp = np;
-  osamp1 = samp1;
-  osamp2 = samp2;
+
+  // Open the files and load header information
+  for (i=0;i<nFiles;i++)
+    {
+      pfitsOpenFile(dSet[i],debug);
+      pfitsLoadHeader(dSet[i],debug);
+    }
+  
+  // Setup the plots
+  if (sval != -1)
+    {
+      for (i=0;i<nFiles;i++)
+	{
+	  plot[i]->t2=plot[i]->t1=sval;
+	  plot[i]->rangeType=1;
+	}
+    }
+  else if (s1 != -1 && s2 != -1)
+    {
+      for (i=0;i<nFiles;i++)
+	{
+	  plot[i]->t1 = s1;
+	  plot[i]->t2 = s2;
+	  plot[i]->rangeType = 2;
+	  printf("Setting time range to %g %g\n",plot[i]->t1,plot[i]->t2);
+	}
+    }
+  else if (t1!=-1 && t2==-1) // If a single time is given
+    {
+      for (i=0;i<nFiles;i++)
+	{
+	  plot[i]->t2=plot[i]->t1=(int)(t1/(dSet[i]->head->nsblk*dSet[i]->head->tsamp));
+	  printf("Set subint = %g\n",plot[i]->t2);
+	  plot[i]->rangeType=1;
+	}
+    }
+  else
+    {
+      for (i=0;i<nFiles;i++)
+	{
+	  plot[i]->t2=t2;
+	  plot[i]->t1=t1;
+	  plot[i]->rangeType=3;
+	}
+    }
 
 
-  printf("\n\n");
-  printf("f       show a frequency-time plot for the zoom region\n");
-  printf("l       ascii listing of dispersed data in zoom region\n");
-  printf("q       quit\n");
-  printf("r       reload data within the zoom region\n");
-  printf("s       show subintegration boundaries\n");
-  printf("u       unzoom to specified region given the last reload\n");
-  printf("U       show the entire observation\n");
-  printf("w       create .wav file for zoom region\n");
-  printf("z       zoom into a specified region\n");
-  printf("\n\n");
-  do {
-    for (i=0;i<np;i++)
-      {
-	fx[i] = samp1*data->phead.tsamp + (i+0.5)*data->phead.tsamp*nsmooth ;
-	if (findXrange==1)
-	  {
-	    if (i==0)
-	      minx = maxx = fx[i];
-	    else if (minx > fx[i]) minx = fx[i];
-	    else if (maxx < fx[i]) maxx = fx[i];
-	  }
-	if (findYrange==1)
-	  {
-	    if (i==0)
-	      {
-		miny = min[i];
-		maxy = max[i];
-	      }
-	    if (miny > min[i]) miny = min[i];
-	    if (maxy < max[i]) maxy = max[i];
-	  }
-	
-      }
-    findXrange=0;
-    findYrange=0;
-    cpgenv(minx,maxx,miny,maxy,0,1);
-    cpglab("Time (s)","",fname);
-    printf("nsmooth = %d\n",nsmooth);
-    if (nsmooth > 1)
-      {
-	cpgsci(2); cpgbin(np,fx,min,1);
-	cpgsci(3); cpgbin(np,fx,max,1);
-      }
-    cpgsci(1); cpgbin(np,fx,mean,1);
-    //    cpgpt(np,fx,mean,4);
-    if (plotSubint==1)
-      {
-	for (i=0;i<data->phead.nsub;i++)
-	  {
-	    tx[0] = tx[1] = i*data->phead.nsblk*data->phead.tsamp;
-	    ty[0] = miny; ty[1] = maxy;
-	    cpgsci(7); cpgsls(4); cpgline(2,tx,ty); cpgsci(1); cpgsls(1);
-	  }
-      }
-    cpgcurs(&mx,&my,&key);
-    if (key=='z')
-      {
-	cpgband(2,0,mx,my,&mx2,&my2,&key);
-	if (mx > mx2) {maxx = mx; minx = mx2;}
-	else {maxx = mx2; minx = mx;}
-	
-	if (my > my2) {maxy = my; miny = my2;}
-	else {maxy = my2; miny = my;}	   
-	findXrange=0;
-	findYrange=0;
-      }
-    else if (key=='l')
-      {
-	char fname[128];
-	FILE *fout;
-	long s1,s2;
-
-	printf("Enter filename: ");
-	scanf("%s",fname);
-	if (!(fout = fopen(fname,"w")))
-	  printf("Unable to open file >%s<\n",fname);
-	else
-	  {
-	    s1 = (int)(minx/data->phead.tsamp);
-	    s2 = (int)(maxx/data->phead.tsamp);
-	    if (s1 < 0) s1=0;
-	    if (s2 >= data->phead.nsblk*data->phead.nsub)
-	      s2 = data->phead.nsblk*data->phead.nsub-1;
-	    
-	    writeData(fp,fout,data,s1,s2,dm);	    
-	    fclose(fout);
-	  }
-      }
-    else if (key=='h') // Plot histogram of the values
-      {
-	float *vals;
-	int nbin;
-	float hist_minx;
-	float hist_maxx;
-	int count;
-	double sx,sx2,mean,sdev;
-	float fx[2],fy[2];
-
-	if (data->phead.nbits==1) {hist_minx = -1; hist_maxx = 1; nbin = 4;}
-	if (data->phead.nbits==2) {hist_minx = -4; hist_maxx = 4; nbin = 10;}
-	if (data->phead.nbits==4) {hist_minx = 0; hist_maxx = 16; nbin = 16;}
-	if (data->phead.nbits==8) {hist_minx = 0; hist_maxx = 255; nbin = 255;}
-	if (!(vals = (float *)malloc(sizeof(float)*((maxx-minx)/data->phead.tsamp)*(data->phead.nchan))))
-	  {
-	    printf("Sorry: unable to allocate enough memory - please choose a smaller region\n");
-	  }
-	else
-	  {
-	    count = extractPolData(fp,data,1,vals,minx,maxx);
-	    cpgend();
-	    cpgbeg(0,"4/xs",1,1);
-	    sx=0;
-	    sx2=0;
-	    for (i=0;i<count;i++)
-	      {
-		sx+=vals[i];
-		sx2+=vals[i]*vals[i];
-	      }
-	    mean = sx/(double)count;
-	    sdev = sqrt(sx2/(double)(count)-pow(sx/(double)(count),2));
-	    printf("Mean = %g\n",sx/(double)count);
-	    printf("Sdev = %g\n",sqrt(sx2/(double)(count)-pow(sx/(double)(count),2)));
-	    //	  printf("have: %g\n",vals[i]);
-	    draw_histogram(vals,count,nbin,hist_minx,hist_maxx,1,-1,-1,0,0.5,0);
-	    cpglab("Level","","");
-	    cpgsci(2);
-	    fx[0]=fx[1] = mean;
-	    fy[0] =0; fy[1] = 1;
-	    cpgline(2,fx,fy);
-	    fx[0]=fx[1] = mean+sdev;
-	    cpgsls(4);
-	    cpgline(2,fx,fy);
-	    fx[0]=fx[1] = mean-sdev;
-	    cpgline(2,fx,fy);
-	    cpgsci(1); cpgsls(1);
-	    cpgend();
-	    cpgbeg(0,grDev,1,1);
-	    free(vals);
-	  }
-      }
-    else if (key=='u')
-      {
-	findXrange=1;
-	findYrange=1;
-      }
-    else if (key=='U')
-      {
-	findXrange=1;
-	findYrange=1;
-	np = onp;
-	samp1 = osamp1;
-	samp2 = osamp2;
-	nsmooth = onsmooth;
-	for (i=0;i<np;i++)
-	  {
-	    mean[i] = omean[i];
-	    min[i] = omin[i];
-	    max[i] = omax[i];
-	  }
-      }
-    else if (key=='f')
-      {
-	printf("plotting frequency\n");
-	cpgend();
-	printf("Here minx = %g, maxx = %g\n",minx,maxx);
-	plotFrequency(fp,data,minx,maxx);
-	cpgbeg(0,grDev,1,1);
-	cpgask(0);
-      }
-    else if (key=='r')
-      {
-	findXrange=1;
-	findYrange=1;
-	samp1 = (int)(minx/data->phead.tsamp);
-	samp2 = (int)(maxx/data->phead.tsamp);
-	printf("New sample range (a): %d %d\n",samp1,samp2);
-	if (samp1 < 0) samp1=0;
-	if (samp2 >= data->phead.nsblk*data->phead.nsub)
-	  samp2 = data->phead.nsblk*data->phead.nsub-1;
-	printf("New sample range: %d %d\n",samp1,samp2);
-	if (dm==0)
-	  np = extractDataZeroDM(fp,data,samp1,samp2,mean,min,max,MAX_RET,&nsmooth);
-	else
-	  np = extractData(fp,data,samp1,samp2,mean,min,max,MAX_RET,&nsmooth,dm);
-	printf("Complete extraction; np = %d, nsmooth = %d\n",np,nsmooth);
-      }
-    else if (key=='s')
-      plotSubint*=-1;
-  } while (key!='q');
-  cpgend();
-  freeDset(data);
-  closeFitsFile(fp);
+  // Do the plot
+  doPlot(dSet,nFiles,plot,debug,offScl);
+ 
+  // Close the file
+  //  pfitsCloseFile(dSet,debug);
+  
+  // De-allocate the memory
+  for (i=0;i<nFiles;i++)
+    {
+      deallocateMemory(&dSet[i],debug);
+      free(plot[i]);
+    }
+  
+  free(dSet);
+  free(plot);
 }
 
-void plotFrequency(fitsfile *fp,dSet *d,float mint,float maxt)
+void doPlot(dSetStruct **dSet,int nFiles,plotStruct **plot,int debug,int offScl)
+{
+  float **plotArr_p0;
+  float **plotArr_p1;
+  float **plotArr_p2;
+  float **plotArr_p3;
+  
+  float tr[6];
+  int nsblk;
+  int nchan;
+  char key;
+  float mx,my,mx2,my2;
+  int i,j,k,p;
+  float dmVal[64];
+  float dmVal_time[64];
+  int nDM_curve=0;
+  int colourPlot=1;
+  int xDisplay = 0; // 0 = sample number, 1 = time in seconds from start of observation
+  int nWin=0;
+  int curWin;
+  int nPanelX=0;
+  int nPanelY=0;
+  char tStr[128];
+  int nsamp;
+  int nsubLoad;
+  char grDev[128]="/xs";
+  int plotWifi=0;
+  int centreLine=-1;
+  
+  // Set up defaults and allocate memory
+  nchan = dSet[0]->head->nchan;
+  nsblk = dSet[0]->head->nsblk;
+
+  nsubLoad = (plot[0]->t2-plot[0]->t1)+1;
+  nsamp = nchan*nsblk*nsubLoad;
+  
+  printf("Source: %s\n",dSet[0]->head->source);
+  printf("Npol: %d\n",dSet[0]->head->npol);
+  printf("nsblk: %d\n",nsblk);
+  printf("nchan: %d\n",nchan);
+  printf("nbits: %d\n",dSet[0]->head->nbits);
+  plotArr_p0 = (float **)malloc(sizeof(float *)*nFiles);
+  plotArr_p1 = (float **)malloc(sizeof(float *)*nFiles);
+  plotArr_p2 = (float **)malloc(sizeof(float *)*nFiles);
+  plotArr_p3 = (float **)malloc(sizeof(float *)*nFiles);
+
+  for (i=0;i<nFiles;i++)
+    {
+      plotArr_p0[i] = (float *)malloc(sizeof(float)*nsamp);  
+      if (dSet[0]->head->npol==4)
+	{
+	  plotArr_p1[i] = (float *)malloc(sizeof(float)*nsamp);  
+	  plotArr_p2[i] = (float *)malloc(sizeof(float)*nsamp);  
+	  plotArr_p3[i] = (float *)malloc(sizeof(float)*nsamp);  
+	}
+      else if (dSet[0]->head->npol==2)
+	{
+	  plotArr_p1[i] = (float *)malloc(sizeof(float)*nsamp);  
+	  plotArr_p2[i] = (float *)malloc(sizeof(float));  
+	  plotArr_p3[i] = (float *)malloc(sizeof(float));  
+	}
+      else
+	{
+	  plotArr_p1[i] = (float *)malloc(sizeof(float));  
+	  plotArr_p2[i] = (float *)malloc(sizeof(float));  
+	  plotArr_p3[i] = (float *)malloc(sizeof(float));  
+	}
+    }
+  // Load the data
+
+  loadPlotData(nFiles,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3,plot,dSet,debug,offScl);
+
+  // Setup windows and panels
+  if (nFiles==1 && dSet[0]->head->npol==1)
+    {
+      plot[0]->windowNum = 1;
+      plot[0]->xpanelNum = 1;
+      plot[0]->ypanelNum = 1;
+      nWin=1;
+      nPanelX=1;
+      nPanelY=1;      
+    }
+  else if (nFiles==1 && dSet[0]->head->npol==4 && plot[0]->polPlot == 1)
+    {
+      plot[0]->windowNum = 1;
+      plot[0]->xpanelNum = 1;
+      plot[0]->ypanelNum = 1;
+      nWin=1;
+      nPanelX=2;
+      nPanelY=2;      
+    }
+  else if (nFiles==1 && dSet[0]->head->npol==2 && plot[0]->polPlot == 1)
+    {
+      plot[0]->windowNum = 1;
+      plot[0]->xpanelNum = 1;
+      plot[0]->ypanelNum = 1;
+      nWin=1;
+      nPanelX=2;
+      nPanelY=1;      
+    }
+  else if (nFiles==1 && dSet[0]->head->npol==4 && plot[0]->polPlot == 2)
+    {
+      plot[0]->windowNum = 1;
+      plot[0]->xpanelNum = 1;
+      plot[0]->ypanelNum = 1;
+      nWin=1;
+      nPanelX=1;
+      nPanelY=1;      
+    }
+  else
+    {
+      for (i=0;i<nFiles;i++)
+	{
+	  plot[i]->windowNum = 1;
+	  plot[i]->xpanelNum = 1;
+	  plot[i]->ypanelNum = i+1;
+	}
+      nWin=1;
+      nPanelX = 1;
+      nPanelY = nFiles;
+    }
+
+
+  setMinMaxVals(dSet,plot,nFiles,nchan,nsblk,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);
+    
+  do {
+      // Go through each window being plotted
+      curWin = -1;
+      for (k=0;k<nFiles;k++)
+	{
+	  for (p=0;p<dSet[k]->head->npol;p++)
+	    {
+	      if (plot[k]->windowNum!=curWin)
+		{
+		  // Open a window
+		  if (strcmp(grDev,"/xs")==0)
+		    {
+		      sprintf(tStr,"%d/xs",plot[k]->windowNum);		      
+		      cpgbeg(0,tStr,nPanelX,nPanelY);
+		    }
+		  else
+		    cpgbeg(0,grDev,nPanelX,nPanelY);
+		  
+		  cpgsch(1.4);  cpgscf(2);  cpgslw(2);
+		  cpgask(0);
+		  curWin = plot[k]->windowNum;
+		}
+	      // Find the correct panel
+	      cpgpanl(plot[k]->xpanelNum,plot[k]->ypanelNum);
+	      if (plot[k]->polPlot==1)
+		{
+		  if (p==0) drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);
+		  if (p==1) {cpgpanl(plot[k]->xpanelNum+1,plot[k]->ypanelNum); drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);}
+		  if (p==2) {cpgpanl(plot[k]->xpanelNum,plot[k]->ypanelNum+1);drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);}
+		  if (p==3) {cpgpanl(plot[k]->xpanelNum+1,plot[k]->ypanelNum+1); drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);}
+		}
+	      else if (plot[k]->polPlot==2)
+		drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);
+	      if (plotWifi==1)
+		{
+		  float fx[2],fy[2];
+		  int kk;
+		  for (kk=0;kk<14;kk++)
+		    {
+		      fx[0] = plot[k]->minx;
+		      fx[1] = plot[k]->maxx;
+		      fy[0] = fy[1] = 2412+kk*5;
+		      cpgline(2,fx,fy);
+		    }
+		}
+	      if (centreLine==1)
+		{
+		  float fx[2],fy[2];
+
+
+		  fx[0] = plot[k]->minx;
+		  fx[1] = plot[k]->maxx;
+		  fy[0] = fy[1] = (dSet[0]->head->chanFreq[0] + dSet[0]->head->chanFreq[dSet[0]->head->nchan-1])/2.0;
+		  printf("IN HERE %g %g %g %g\n",fx[0],fx[1],fy[0],fy[1]);
+		  cpgsci(2); cpgline(2,fx,fy); cpgsci(1);
+		}
+	    }	  
+	}
+  
+      
+      if (strcmp(grDev,"/xs")==0)
+	{
+	  cpgcurs(&mx,&my,&key);
+	  if (key=='c')
+	    {
+	      for (i=0;i<nFiles;i++)
+		plot[i]->colourPlot*=-1;
+	    }
+	  else if (key=='o')
+	    {
+	      FILE *fout;
+	      char fname[128];
+	      int ii,jj;
+	      printf("Enter output filename: ");
+	      scanf("%s",fname);
+	      fout = fopen(fname,"w");
+	      //      if (pol==0) cpgimag(plotArr_p0,nchan,plot->nTimeSamples,1,nchan,1,plot->nTimeSamples,plot->minVal,plot->maxVal,tr);
+	      for (i=0;i<nFiles;i++)
+		{
+		  for (ii=0;ii<plot[i]->nTimeSamples;ii++)
+		    {
+		      for (jj=0;jj<nchan;jj++)
+			fprintf(fout,"%d %d %g\n",ii,jj,plotArr_p0[i][ii*nchan+jj]);
+		      fprintf(fout,"\n");
+		    }
+		}
+	      
+	      fclose(fout);
+	    }
+	  else if (key=='+')
+	    {
+	      // Load the data
+	      for (i=0;i<nFiles;i++)
+		{
+		  (plot[i]->t1)++;
+		  (plot[i]->t2)++;
+		}
+	      loadPlotData(nFiles,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3,plot,dSet,debug,offScl);
+	      setMinMaxVals(dSet,plot,nFiles,nchan,nsblk,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);
+	    }
+	  else if (key=='-')
+	    {
+	      // Load the data
+	      for (i=0;i<nFiles;i++)
+		{
+		  (plot[i]->t1)--;
+		  (plot[i]->t2)--;
+		}
+	      loadPlotData(nFiles,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3,plot,dSet,debug,offScl);
+	      setMinMaxVals(dSet,plot,nFiles,nchan,nsblk,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);
+	    }
+	  else if (key=='x')
+	    {
+	      for (i=0;i<nFiles;i++)
+		{	      
+		  plot[i]->xPlotType++;
+		  if (plot[i]->xPlotType==3)
+		    plot[i]->xPlotType=1;
+		}
+	    }
+	  else if (key=='z')
+	    {
+	      cpgband(2,0,mx,my,&mx2,&my2,&key);
+	      for (i=0;i<nFiles;i++)
+		{
+		  if (plot[i]->xPlotType==1)
+		    {
+		      plot[i]->minx = mx;
+		      plot[i]->maxx = mx2;
+		      plot[i]->miny = my;
+		      plot[i]->maxy = my2;
+		    }
+		  else if (plot[i]->xPlotType==2)
+		    {
+		      float s1,s2;
+		      s1 = dSet[i]->head->nsblk*plot[i]->t1*dSet[i]->head->tsamp;
+		      s2 = dSet[i]->head->tsamp;
+		      plot[i]->minx = (mx - s1)/s2;
+		      plot[i]->maxx = (mx2 - s1)/s2;
+		      plot[i]->miny = my;
+		      plot[i]->maxy = my2;
+		    }
+		}
+	    }
+	  else if (key=='w')
+	    {
+	      plotWifi=1;
+	      for (i=0;i<nFiles;i++)
+		{
+		  if (plot[i]->xPlotType==1)
+		    {
+		      plot[i]->minx = mx;
+		      plot[i]->maxx = mx2;
+		      plot[i]->miny = 2400;
+		      plot[i]->maxy = 2494;
+		    }
+		  else if (plot[i]->xPlotType==2)
+		    {
+		      float s1,s2;
+		      s1 = dSet[i]->head->nsblk*plot[i]->t1*dSet[i]->head->tsamp;
+		      s2 = dSet[i]->head->tsamp;
+		      plot[i]->minx = (mx - s1)/s2;
+		      plot[i]->maxx = (mx2 - s1)/s2;
+		      plot[i]->miny = 2400;
+		      plot[i]->maxy = 2494;
+		    }
+		}
+	    }
+	  else if (key=='g')
+	    {
+	      printf("Enter graphics device\n");
+	      scanf("%s",grDev);
+	    }
+	  else if (key=='.')
+	    centreLine*=-1;
+	  else if (key=='m')
+	    {
+	      float newMax;
+	      printf("Maximum values:");
+	      for (i=0;i<nFiles;i++)
+		printf("File %d = %g\n",i,plot[i]->maxVal);
+	      printf("New maxVal:");
+	      scanf("%f",&newMax);
+	      for (i=0;i<nFiles;i++)
+		plot[i]->maxVal = newMax;
+	      
+	    }	  
+	  else if (key=='M')
+	    {
+	      float newMin;
+	      printf("Minimum values:");
+	      for (i=0;i<nFiles;i++)
+		printf("File %d = %g\n",i,plot[i]->minVal);
+	      printf("New minVal:");
+	      scanf("%f",&newMin);
+	      for (i=0;i<nFiles;i++)
+		plot[i]->minVal = newMin;
+	      
+	    }	  
+	  else if (key=='u')
+	    {
+	      for (i=0;i<nFiles;i++)
+		{
+		  plot[i]->minx = plot[i]->ominx;
+		  plot[i]->maxx = plot[i]->omaxx;
+		  plot[i]->miny = plot[i]->ominy;
+		  plot[i]->maxy = plot[i]->omaxy;
+		  
+		}
+	    }
+	  else if (key=='A')
+	    printf("Cursor coordinate is (%g,%g)\n",mx,my);
+	  else
+	    printf("Unknown key-stroke %c\n",key);
+	  /*      else if (key=='c')
+		  colourPlot*=-1;
+		  else if (key=='x')
+		  {
+		  xDisplay++;
+		  if (xDisplay == 2) xDisplay=0;
+		  if (xDisplay == 0)
+		  {
+		  minx = 0;
+		  maxx = nsblk;
+		  }
+		  else
+		  {
+		  minx = dSet[0]->head->nsblk*plot->t1*dSet[0]->head->tsamp;
+		  maxx = dSet[0]->head->nsblk*(plot->t1+1)*dSet[0]->head->tsamp;
+		  }
+		  ominx = minx;
+	  omaxx = maxx;
+	  }
+      else if (key=='d') // Overlay DM curve
+	{
+	  //  	  printf("Enter DM ");
+	  //	  scanf("%f",&dmVal[nDM_curve++]);
+
+	  printf("Enter DM ");
+	  scanf("%f",&dmVal[nDM_curve]);
+	  printf("Sample number ");
+	  scanf("%f",&dmVal_time[nDM_curve++]);
+	  } */
+	}
+      else
+	strcpy(grDev,"/xs");
+  } while (key!='q');
+
+      cpgend();
+  for (i=0;i<nFiles;i++)
+    {
+      free(plotArr_p0[i]);
+      free(plotArr_p1[i]);
+      free(plotArr_p2[i]);
+      free(plotArr_p3[i]);
+    }
+  free(plotArr_p0);
+  free(plotArr_p1);
+  free(plotArr_p2);
+  free(plotArr_p3);
+}
+
+void initialisePlot(plotStruct *plot)
+{
+  plot->freqTimeRes = 2048; // Frequency time plot resolution
+  //  plot->freqTimeRes = 26624; // Frequency time plot resolution
+  plot->t1 = 1;
+  plot->t2 = 1;
+  plot->rangeType = 1; // Single subint
+  plot->colourPlot = 1;
+  plot->xPlotType = 1;
+  plot->polPlot = 1;
+}
+
+
+
+void loadPlotData(int nFiles,float **plotArr_p0,float **plotArr_p1,float **plotArr_p2,float **plotArr_p3,plotStruct **plot,dSetStruct **dSet,int debug,int offScl)
+{
+  int i;
+  int j;
+  calibrateStruct cal;
+  
+  cal.baseline_p0[0] = 145;
+  cal.baseline_p1[0] = 145;
+  cal.baseline_p2[0] = 185;
+  cal.baseline_p3[0] = 205;
+
+  for (i=0;i<nFiles;i++)
+    {
+      pfits_read1pol_float(plotArr_p0[i],0,dSet[i],plot[i]->t1,plot[i]->t2,plot[i]->rangeType,&(plot[i]->nSamples),&(plot[i]->nTimeSamples),&(plot[i]->nFrequencySamples),debug,offScl);
+      printf("Loaded nsamples %d %d %d\n",plot[i]->nSamples,plot[i]->nTimeSamples,plot[i]->nFrequencySamples);
+      //      for (j=0;j<plot[i]->nSamples;j++)
+      //	printf("Plot %f\n",plotArr_p0[i]);
+      
+      if (dSet[0]->head->npol==4)
+	{
+	 pfits_read1pol_float(plotArr_p1[i],1,dSet[i],plot[i]->t1,plot[i]->t2,plot[i]->rangeType,&(plot[i]->nSamples),&(plot[i]->nTimeSamples),&(plot[i]->nFrequencySamples),debug,offScl);    
+	 pfits_read1pol_float(plotArr_p2[i],2,dSet[i],plot[i]->t1,plot[i]->t2,plot[i]->rangeType,&(plot[i]->nSamples),&(plot[i]->nTimeSamples),&(plot[i]->nFrequencySamples),debug,offScl);    
+	 pfits_read1pol_float(plotArr_p3[i],3,dSet[i],plot[i]->t1,plot[i]->t2,plot[i]->rangeType,&(plot[i]->nSamples),&(plot[i]->nTimeSamples),&(plot[i]->nFrequencySamples),debug,offScl);    
+
+	 // Calibrate/scale
+	 //	 calibrateScalePols(&cal,plotArr_p0[i],plotArr_p1[i],plotArr_p2[i],plotArr_p3[i],plot[i]->nSamples);
+	}
+      else if (dSet[0]->head->npol==2)
+	{
+	  pfits_read1pol_float(plotArr_p1[i],1,dSet[i],plot[i]->t1,plot[i]->t2,plot[i]->rangeType,&(plot[i]->nSamples),&(plot[i]->nTimeSamples),&(plot[i]->nFrequencySamples),debug,offScl);    
+	}
+    }
+} 
+
+void setMinMaxVals(dSetStruct **dSet,plotStruct **plot,int nFiles,int nchan,int nsblk,float **plotArr_p0,float **plotArr_p1,float **plotArr_p2,float **plotArr_p3)
+{
+  int i,j;
+
+  for (i=0;i<nFiles;i++)
+    {
+      if (dSet[i]->head->nbits == 1)
+	{
+	  plot[i]->minVal = -1;
+	  plot[i]->maxVal = 1;
+	}
+      else if (dSet[i]->head->nbits == 2)
+	{
+	  plot[i]->minVal = 0;
+	  plot[i]->maxVal = 4;
+	}
+      else if (dSet[i]->head->nbits == 4)
+	{
+	  plot[i]->minVal = 0;
+	  plot[i]->maxVal = 16;
+	}
+      else if (dSet[i]->head->nbits == 8)
+	{
+	  plot[i]->minVal = 0;
+	  plot[i]->maxVal = 255;
+	  //	  plot[i]->maxVal = 12;
+	}
+      else if (dSet[i]->head->nbits == 16)
+	{
+	  plot[i]->minVal = -3000; // -32768;
+	  plot[i]->maxVal = 3000; //32768;
+	}
+      else if (dSet[i]->head->nbits == 32)
+	{
+	  plot[i]->minVal = -1024;
+	  plot[i]->maxVal = 1024; // This should be set properly
+	}
+    
+      plot[i]->minx = 0;
+      plot[i]->maxx = plot[i]->nTimeSamples;
+
+      if (nchan==1)
+	{
+	  plot[i]->miny = plot[i]->maxy = plotArr_p0[i][0];
+	  for (j=0;j<nsblk;j++)
+	    {
+	      if (plotArr_p0[i][j] < plot[i]->miny) plot[i]->miny = plotArr_p0[i][j];
+	      if (plotArr_p0[i][j] > plot[i]->maxy) plot[i]->maxy = plotArr_p0[i][j];
+	    }
+	  
+	}
+      else
+	{
+	  printf("Setting miny with multiple channels\n");
+	  printf("Number of channels = %d\n",dSet[i]->head->nchan);
+	  printf("Channel 0 = %g\n",dSet[i]->head->chanFreq[0]);
+	  printf("Channel N-1 = %g\n",dSet[i]->head->chanFreq[dSet[i]->head->nchan-1]);
+	  plot[i]->miny = dSet[i]->head->chanFreq[0];
+	  if (nFiles > 1)
+	    plot[i]->maxy = dSet[nFiles-1]->head->chanFreq[dSet[nFiles-1]->head->nchan-1];
+	  else
+	    plot[i]->maxy = dSet[i]->head->chanFreq[dSet[i]->head->nchan-1];
+	  //	  plot[i]->miny = 0; plot[i]->maxy=2000;
+	}
+
+      plot[i]->ominx = plot[i]->minx;
+      plot[i]->omaxx = plot[i]->maxx;
+      plot[i]->ominy = plot[i]->miny;
+      plot[i]->omaxy = plot[i]->maxy;
+      printf("Set min/max values with %g %g %g %g %g %g\n",plot[i]->minx,plot[i]->maxx,plot[i]->miny,plot[i]->maxy,plot[i]->minVal,plot[i]->maxVal);
+    }
+
+}
+
+void drawPlot(int nFiles,int fileNum,int pol,dSetStruct **dSet,plotStruct **plot,float **plotArr_p0,
+	      float **plotArr_p1,float **plotArr_p2,float **plotArr_p3)
+{
+  if (dSet[fileNum]->head->nchan > 1)
+    {
+      drawColourMap(dSet[fileNum],pol,plot[fileNum],plotArr_p0[fileNum],plotArr_p1[fileNum],plotArr_p2[fileNum],plotArr_p3[fileNum]);
+    }
+  else
+    drawLinePlot(dSet[fileNum],pol,plot[fileNum],plotArr_p0[fileNum],plotArr_p1[fileNum],plotArr_p2[fileNum],plotArr_p3[fileNum]);
+}
+
+void drawLinePlot(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
+		  float *plotArr_p1,float *plotArr_p2,float *plotArr_p3)
+{
+  int i;
+  float plotX[plot->nTimeSamples];
+
+
+  for (i=0;i<plot->nTimeSamples;i++)
+    {
+      plotX[i] = i;
+      printf("Res %g\n",plotArr_p0[i]);
+    }
+  //  plot->maxy = 300;
+  //    plot->miny = 6e4;
+  cpgsvp(0.1,0.9,0.15,0.9);
+  cpgswin(plot->minx,plot->maxx,plot->miny,plot->maxy);
+  cpgbox("ABCTSN",0,0,"ABCTSN",0,0);
+  if (plot->polPlot==1)
+    {
+      if (pol==0) cpgline(plot->nTimeSamples,plotX,plotArr_p0);
+      else if (pol==1) cpgline(plot->nTimeSamples,plotX,plotArr_p1);
+      else if (pol==2) cpgline(plot->nTimeSamples,plotX,plotArr_p2);
+      else if (pol==3) cpgline(plot->nTimeSamples,plotX,plotArr_p3);
+    }
+  else
+    {
+      cpgline(plot->nTimeSamples,plotX,plotArr_p0);
+      cpgsci(2); cpgline(plot->nTimeSamples,plotX,plotArr_p1);
+      cpgsci(3); cpgline(plot->nTimeSamples,plotX,plotArr_p2);
+      cpgsci(4); cpgline(plot->nTimeSamples,plotX,plotArr_p3);
+      cpgsci(1);
+    }
+}
+
+void drawColourMap(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
+		   float *plotArr_p1,float *plotArr_p2,float *plotArr_p3)
 {
   float tr[6];
-  float min,max;
-  int i,j,n=0,i0,i1,p;
-  int npts = (int)(((maxt-mint)/d->phead.tsamp)+0.5);
-  float *arr;
-  float my,mx,mx2,my2;
-  char key;
-  float minx,maxx,miny,maxy;
-  float ominx,omaxx,ominy,omaxy;
+  int nchan = dSet->head->nchan;
+  int nsblk = dSet->head->nsblk;
+  float heat_l[] = {0.0, 0.2, 0.4, 0.6, 1.0};
+  float heat_r[] = {0.0, 0.5, 1.0, 1.0, 1.0};
+  float heat_g[] = {0.0, 0.0, 0.5, 1.0, 1.0};
+  float heat_b[] = {0.0, 0.0, 0.0, 0.3, 1.0};
+  char title[128];
 
-  printf("Allocated arr size: %d, npts = %d, %g %g\n",npts*d->phead.nchan,npts,maxt,mint);
-  if (!(arr = (float *)malloc(sizeof(float)*npts*d->phead.nchan)))
+  printf("Drawing a colour map\n");
+  
+  if (plot->xPlotType==1)
     {
-      printf("plotFreq: unable to allocate memory\n");
-      exit(1);
+      tr[0] = 0;  tr[1] = 0;  tr[2] = 1;
     }
-  if (d->phead.npol==1)
-    cpgbeg(0,"2/xs",1,1);
-  else  
-    cpgbeg(0,"2/xs",2,2);
-  printf("mint/maxt = %g %g\n",mint,maxt);
-  npts = extractPolData(fp,d,0,arr,mint,maxt);
-
-  //  for (i=0;i<npts;i++)
-  //    printf("Res: %f\n",arr[i]);
-
-  tr[0] = mint;
-  tr[1] = d->phead.tsamp;
-  tr[2] = 0;
-  tr[3] = d->phead.freq-d->phead.bw/2;
-  tr[4] = 0;
-  tr[5] =  (float)d->phead.bw/d->phead.nchan;
-
-
-  /*  tr[0] = 0;
-  tr[1] = 1;
-  tr[2] = 0;
-  tr[3] = 0;
-  tr[4] = 0;
-  tr[5] = 1;*/
-
-
-  //  for (i=0;i<1024;i++)
-  //    printf("arr = %g\n",arr[i]);
-
-  //  for (p=0;p<d->phead.npol;p++)
+  else if (plot->xPlotType==2)
     {
-      n=0;
-      for (i=0;i<npts*d->phead.nchan;i++)
-	{
-	  if (i==0)
-	    {
-	      min = max = arr[n];
-	    }
-	  else 
-	    {
-	      if (min > arr[n]) min = arr[n];
-	      if (max < arr[n]) max = arr[n];
-	    }
-	  n++;
-	}
-      printf("min = %g, max = %g, n = %d\n",min,max,n);
-      printf("nchan = %d, npts = %d\n",d->phead.nchan,npts);
-      //cpgenv(mint,maxt,d->phead.freq-d->phead.bw/2,d->phead.freq+d->phead.bw/2,0,1);
-      //      cpgenv(d->phead.freq-d->phead.bw/2,d->phead.freq+d->phead.bw/2,mint,maxt,0,1);
-      //      cpgenv(0,3000,0,3000,0,1);
-      //cpgenv(0,d->phead.nchan,0,npts,0,1);
-      printf("doing the image\n");
-      //      cpggray(arr,npts,d->phead.nchan,1,npts,1,d->phead.nchan,min,max,tr);
-      cpgask(0);
-      ominx = minx = mint;
-      omaxx = maxx = maxt;
-      ominy = miny = d->phead.freq-d->phead.bw/2;
-      omaxy = maxy = d->phead.freq+d->phead.bw/2;
-      do {
-	cpgenv(minx,maxx,miny,maxy,0,1);
-	cpglab("Time (s)","Frequency (MHz)","");
-	cpggray(arr,npts,d->phead.nchan,1,npts,1,d->phead.nchan,min,max,tr);
-	
-	cpgcurs(&mx,&my,&key);
-
-	if (key=='z')
-	  {
-	    cpgband(2,0,mx,my,&mx2,&my2,&key);
-	    if (mx > mx2) {maxx = mx; minx = mx2;}
-	    else {maxx = mx2; minx = mx;}
-	    
-	    if (my > my2) {maxy = my; miny = my2;}
-	    else {maxy = my2; miny = my;}	   
-	  }
-	else if (key=='u')
-	  {
-	    minx = ominx;
-	    maxx = omaxx;
-	    miny = ominy;
-	    maxy = omaxy;
-	  }
-	else if (key=='b')
-	  {
-	    cpgend();
-	    cpgbeg(0,"3/xs",1,1);
-	    plotBpass(arr,d->phead.nchan,npts);
-	    cpgend();
-	    cpgbeg(0,"2/xs",1,1);
-	    cpgask(0);
-	  }
-	
-      } while (key!='q');
-      printf("Done the image\n");
-	       }
-  cpgend();
-  free(arr);
-}
-
-void plotBpass(float *arr,int nchan,int npts)
-{
-  float bpass[nchan],x[nchan];
-  int i,j;
-  double sum;
-  float minx=0;
-  float maxx = nchan;
-  float maxy=0;
-  float miny=0;
-  float my,mx,mx2,my2;
-  char key;
-
-  float ominx,omaxx,ominy,omaxy;
-  cpgask(0);
-  for (i=0;i<nchan;i++)
-    {
-      x[i] = i;
-      sum=0.0;
-      for (j=0;j<npts;j++)
-	sum+=arr[i*npts+j];
-      bpass[i] = sum/(double)npts;
-      printf("npts for channel %d = %d\n",i,npts);
-      if (i==0){ miny = maxy = bpass[i];}
-      if (bpass[i] > maxy) maxy = bpass[i];
-      if (bpass[i] < miny) miny = bpass[i];
+      tr[0] = dSet->head->nsblk*plot->t1*dSet->head->tsamp;
+      tr[1] = 0;
+      tr[2] = dSet->head->tsamp;
     }
-  ominx = minx;
-  omaxx = maxx;
-  ominy = miny;
-  omaxy = maxy;
-  do {
-    cpgenv(minx,maxx,miny,maxy,0,1);
-    cpglab("Channel number","Mean value","");
-    cpgbin(nchan,x,bpass,1);
-	cpgcurs(&mx,&my,&key);
+  tr[3] = dSet->head->chanFreq[0];  tr[4] = dSet->head->chanbw;  tr[5] = 0;
+  printf("Plotting with: %g %g %g %g\n",plot->minx,plot->maxx,plot->miny,plot->maxy);
+  if (plot->xPlotType==1)
+    {
+      //    cpgenv(plot->minx,plot->maxx,plot->miny,plot->maxy,0,1);
+      cpgsvp(0.1,0.9,0.15,0.9);
+      cpgswin(plot->minx,plot->maxx,plot->miny,plot->maxy);
+      
+      //      cpgswin(plot->minx,plot->maxx,0,1000);
+      //        cpgswin(plot->minx,plot->maxx,0,plot->maxy);
+      cpgbox("ABCTSN",0,0,"ABCTSN",0,0);
+    }
+  else if (plot->xPlotType==2)
+    {
+      //      cpgenv(dSet->head->nsblk*plot->t1*dSet->head->tsamp+dSet->head->tsamp*plot->minx,
+      //	     dSet->head->nsblk*plot->t1*dSet->head->tsamp+dSet->head->tsamp*plot->maxx,
+      //	     plot->miny,plot->maxy,0,1);
+      cpgsvp(0.1,0.9,0.15,0.9);
+      cpgswin(dSet->head->nsblk*plot->t1*dSet->head->tsamp+dSet->head->tsamp*plot->minx,dSet->head->nsblk*plot->t1*dSet->head->tsamp+dSet->head->tsamp*plot->maxx,plot->miny,plot->maxy);
+      cpgbox("ABCTSN",0,0,"ABCTSN",0,0);
 
-	if (key=='z')
-	  {
-	    cpgband(2,0,mx,my,&mx2,&my2,&key);
-	    if (mx > mx2) {maxx = mx; minx = mx2;}
-	    else {maxx = mx2; minx = mx;}
-	    
-	    if (my > my2) {maxy = my; miny = my2;}
-	    else {maxy = my2; miny = my;}	   
-	  }
-	else if (key=='u')
-	  {
-	    minx = ominx;
-	    maxx = omaxx;
-	    miny = ominy;
-	    maxy = omaxy;
-	  }
-  }while (key!='q');
-}
 
-void draw_histogram(float *x,int count,int nbin,float minx,float maxx,int normalise,float maxy,int colour,int log,float offset,int histOutput)
-{
-  int i,j;
-  float binvalX[nbin],binvalY[nbin];
-  float binsize;
-  float area;
-  float highest;
-  float scale;
-  char dummy[10];
-  printf("Offset = %f\n",offset);
-  for (i=0;i<nbin;i++)
-    {
-      binvalX[i]=i*(maxx-minx)/nbin+minx+(maxx-minx)/nbin*offset;
-      binvalY[i]=0.0;
     }
+  sprintf(title,"%s (subint %.0f-%.0f)",dSet->fileName,plot->t1,plot->t2);
+  
+  if (plot->xPlotType==1)
+    cpglab("Sample","Frequency (MHz)",title);            
+  else if (plot->xPlotType==2)
+    cpglab("Time from observation start (s)","Frequency (MHz)",title);            
 
-  for (i=0;i<count;i++)
+  if (plot->colourPlot==1)
     {
-      /*      if ((int)((x[i]-minx)/((maxx-minx)/nbin))>=0 
-        && (int)((x[i]-minx)/((maxx-minx)/nbin)) <100)
-	binvalY[(int)((x[i]-minx)/((maxx-minx)/nbin))]++; */
-      for (j=0;j<nbin-1;j++)
-	{
-	  if (binvalX[j] <= x[i] && binvalX[j+1]>x[i])
-	    {
-	      binvalY[j]++;
-	    }
-	}
-    }
-  if (normalise>0)
-    {
-      area=0.0;
-      for (i=0;i<nbin;i++)
-      area+=binvalY[i];
-      for (i=0;i<nbin;i++)
-      binvalY[i]=binvalY[i]/area*normalise;
-    }
-  /* Normalise so that highest point lies at 1 */
-  highest=0.0;
-  for (i=0;i<nbin;i++)
-    {
-      if (highest<binvalY[i])
-	highest=binvalY[i];
-    }
-  if (maxy<0) maxy = (float)highest+0.1*highest;
-  printf("Maxy = %f %d\n",maxy,normalise);
-  if (normalise<0)
-    {
-      if (highest!=0.0)
-	{
-	  for (i=0;i<nbin;i++)
-	    binvalY[i]/=highest;
-	}
-    }
-  if (colour==-1)
-    {
-      printf("In here with %f %f\n",maxx,maxy);
-      if (log==1)
-      cpgenv(minx, maxx, 0, maxy, 0, 10); 
-      else
-      cpgenv(minx, maxx, 0, maxy, 0, 0); 
-      cpgsls(1);
-      cpgsci(1);
-    }
-  else if (colour==-2)
-    {
-      cpgswin(minx,maxx,0,maxy);
-      cpgsci(1);
-      cpgsls(1);
-      cpgslw(1);
-
+      int i;
+      printf("IN HERE pol = %d %d %d %g %g \n",pol,nchan,plot->nTimeSamples,plot->minVal,plot->maxVal);
+      cpgctab(heat_l,heat_r,heat_g,heat_b,5,1.0,0.5);
+      if (pol==0) cpgimag(plotArr_p0,nchan,plot->nTimeSamples,1,nchan,1,plot->nTimeSamples,plot->minVal,plot->maxVal,tr);
+      else if (pol==1) cpgimag(plotArr_p1,nchan,plot->nTimeSamples,1,nchan,1,plot->nTimeSamples,plot->minVal,plot->maxVal,tr);
+      else if (pol==2) cpgimag(plotArr_p2,nchan,plot->nTimeSamples,1,nchan,1,plot->nTimeSamples,plot->minVal,plot->maxVal,tr);
+      else if (pol==3) cpgimag(plotArr_p3,nchan,plot->nTimeSamples,1,nchan,1,plot->nTimeSamples,plot->minVal,plot->maxVal,tr); 
     }
   else
     {
-      cpgsci(colour);
-      /*      cpgsci(1); */
-      cpgsls(1);
-      cpgslw(1);
-      if (colour==2) cpgslw(5);
-      if (colour==3) cpgsls(3);
-      if (colour==4) cpgsls(5);
-
+      if (pol==0) cpggray(plotArr_p0,nchan,plot->nTimeSamples,1,nchan,1,plot->nTimeSamples,plot->minVal,plot->maxVal,tr);
+      else if (pol==1) cpggray(plotArr_p1,nchan,plot->nTimeSamples,1,nchan,1,plot->nTimeSamples,plot->minVal,plot->maxVal,tr);
+      else if (pol==2) cpggray(plotArr_p2,nchan,plot->nTimeSamples,1,nchan,1,plot->nTimeSamples,plot->minVal,plot->maxVal,tr);
+      else if (pol==3) cpggray(plotArr_p3,nchan,plot->nTimeSamples,1,nchan,1,plot->nTimeSamples,plot->minVal,plot->maxVal,tr);
     }
-  if (histOutput==1)
-    {
-      for (i=0;i<nbin;i++)
-	printf("%d %f %f\n",i,binvalX[i],binvalY[i]);
-    }
-  cpgbin(nbin,binvalX,binvalY,0);
-  cpgsls(1);
-  cpgsci(1);
-  cpgslw(1);
 }
+
+
+/*
+      // Plot the DM curves
+      {
+	float fx[nchan],fy[nchan];
+	int j,sampleOff;
+	double toff,fref;
+	int k,nThick=4;
+	fref = dSet[0]->head->chanFreq[0];
+	
+	for (i=0;i<nDM_curve;i++)
+	  {
+	    for (k=0;k<nThick;k++)
+	      {
+		for (j=0;j<nchan;j++)
+		  {
+		    toff = 4.15e-3*dmVal[i]*(pow(fref/1000.0,-2)-pow(dSet[0]->head->chanFreq[j]/1000.0,-2));
+		    sampleOff = toff/dSet[0]->head->tsamp;
+		    fx[j] =  dmVal_time[i]-sampleOff+k;
+		    fy[j] = dSet[0]->head->chanFreq[j];
+		  }
+		cpgsci(3);
+		cpgline(nchan,fx,fy);
+		cpgsci(1);
+	      }
+	  }
+      }
+
+*/

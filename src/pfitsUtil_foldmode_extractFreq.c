@@ -48,6 +48,8 @@ int main(int argc,char *argv[])
   long naxes[4];
   int naxis=3;
   char tdim[16];
+  float freq1,freq2;
+  int   setFreq=0;
 
   printf("Running pfitsUtil_foldmode_extractFreq\n");
   
@@ -61,8 +63,17 @@ int main(int argc,char *argv[])
 	sscanf(argv[++i], "%d", &outChan1);
       else if (strcmp(argv[i],"-c1")==0) // Last channel
 	sscanf(argv[++i], "%d", &outChan2);
+      else if (strcmp(argv[i],"-f1")==0) 
+	{
+	  sscanf(argv[++i],"%f",&freq1);
+	  setFreq=1;
+	}
+      else if (strcmp(argv[i],"-f2")==0) 
+	sscanf(argv[++i],"%f",&freq2);
     }
 
+
+  
   sprintf(usename,"!%s",outname);
   printf("Using files: %s and %s\n",inname,outname);
   
@@ -85,7 +96,7 @@ int main(int argc,char *argv[])
       fits_read_key(infptr,TINT,"NPOL",&npol,NULL,&status);
       fits_read_key(infptr,TINT,"NBIN",&nbin,NULL,&status);
       fits_read_key(infptr,TINT,"NAXIS2",&nsubint,NULL,&status);
-      
+      fits_get_colnum(infptr, CASEINSEN, "DAT_FREQ", &colnum_in_datFreq, &status);        
     }
 
 
@@ -93,8 +104,49 @@ int main(int argc,char *argv[])
     /* if error occured, print out error message */
     if (status) fits_report_error(stderr, status);
     
+  if (setFreq==1)
+    {
+      float *freq;
+      
+      freq = (float *)malloc(sizeof(float)*nchan);
+      fits_read_col(infptr,TFLOAT,colnum_in_datFreq,1,1,nchan,&nullVal_f,freq,&initflag,&status);
+      if (freq[0] < freq[1])
+	{
+	  for (i=0;i<nchan-1;i++)
+	    {
+	      if (freq1 > freq[i] && freq1 <= freq[i+1])
+		outChan1 = i;
+	      if (freq2 > freq[i] && freq2 <= freq[i+1])
+		outChan2 = i;
+	    }
+	  newNchan= outChan2-outChan1; // +1 ?
+	}
+      else
+	{
+	  printf("Band inverted\n");
+	  if (freq1 < freq2)
+	    {
+	      double temp;
+	      temp = freq2;
+	      freq2 = freq1;
+	      freq1 = temp;
+	    }
+	  for (i=0;i<nchan-1;i++)
+	    {
+	      if (freq1 < freq[i] && freq1 >= freq[i+1])
+		outChan1 = i;
+	      if (freq2 < freq[i] && freq2 >= freq[i+1])
+		outChan2 = i;
+	    }
+	  newNchan= outChan2-outChan1; // +1;
+	  
+	}
+      printf("New channels from %g to %g are %d to %d and number of channels = %d\n",freq1,freq2,outChan1,outChan2,newNchan);
+      free(freq);
+    }
+  else
     newNchan= outChan2-outChan1+1; 
-    printf("New number of channels = %d\n",newNchan);
+  printf("New number of channels = %d\n",newNchan);
     
     dataIn = (int16_t *)malloc(sizeof(int16_t)*nchan*nbin*npol);
     dataOut = (int16_t *)malloc(sizeof(int16_t)*newNchan*nbin*npol);

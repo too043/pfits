@@ -23,9 +23,15 @@ LDADD = libpfits.la @CFITSIO_LIBS@
 
 if HAVE_PGPLOT
 
-bin_PROGRAMS += pfits_plot pfits_plotfold pfits_plotsearch
+  bin_PROGRAMS += pfits_plot \
+    pfits_plotfold \
+    pfits_plotsearch
+  
+  pfits_plot_SOURCES = pfits_plot.c pfits_setup.c pfits_loader.c
+  pfits_plotfold_SOURCES = pfits_plot.c pfits_setup.c pfits_loader.c
+  pfits_plotsearch_SOURCES = pfits_plot.c pfits_setup.c pfits_loader.c
 
-AM_CFLAGS = @PGPLOT_CFLAGS@
-LDADD += @PGPLOT_LIBS@
+  AM_CFLAGS = @PGPLOT_CFLAGS@
+  LDADD += @PGPLOT_LIBS@
 
 endif

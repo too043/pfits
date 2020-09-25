@@ -71,6 +71,7 @@ void pfitsLoadHeader(dSetStruct *dSet,int debug)
   int colnum=0;
   float nval=0;
   int initFlag=0;
+  char strTmp[1024];
   
   if (debug==1)
     printf("Entering loadHeader\n");
@@ -95,7 +96,7 @@ void pfitsLoadHeader(dSetStruct *dSet,int debug)
   if (status) {printf("pos 1 RA\n"); fits_report_error(stderr,status); exit(1);}
   fits_read_key(dSet->fp,TSTRING,"DEC",(dSet->head->dec),NULL,&status);      
   if (status) {printf("pos 1 DEC\n"); fits_report_error(stderr,status); exit(1);}
-  
+
   // Read SUBINT header information
   fits_movnam_hdu(dSet->fp,BINARY_TBL,"SUBINT",1,&status);
   if (status) {printf("pos 1.1\n");  fits_report_error(stderr,status); exit(1);}
@@ -103,22 +104,47 @@ void pfitsLoadHeader(dSetStruct *dSet,int debug)
   if (status) {printf("pos 1.2\n");  fits_report_error(stderr,status); exit(1);}
   fits_read_key(dSet->fp,TINT,"NCHAN",&(dSet->head->nchan),NULL,&status);
   if (status) {printf("pos 1.3\n");  fits_report_error(stderr,status); exit(1);}
-  fits_read_key(dSet->fp,TINT,"NBITS",&(dSet->head->nbits),NULL,&status);
-  if (status) {printf("Error reading nbits ... trying to continue\n"); fits_report_error(stderr,status); status=0;}
+
+  fits_read_key(dSet->fp,TFLOAT,"ZERO_OFF",&(dSet->head->zeroOff),NULL,&status);      
+
+  
+  fits_read_key(dSet->fp,TSTRING,"NBITS",strTmp,NULL,&status);
+  if (strcmp(strTmp,"*")==0)
+    printf("Warning: NBITS is not set\n");
+  else
+    {
+      fits_read_key(dSet->fp,TINT,"NBITS",&(dSet->head->nbits),NULL,&status);
+      if (status) {printf("Error reading nbits ... trying to continue\n"); fits_report_error(stderr,status); status=0;}
+    }
   fits_read_key(dSet->fp,TINT,"NPOL",&(dSet->head->npol),NULL,&status);
   if (status) {printf("pos 1.5\n");  fits_report_error(stderr,status); exit(1);}
-  fits_read_key(dSet->fp,TINT,"NSBLK",&(dSet->head->nsblk),NULL,&status);
-  if (status) {printf("pos 1.6\n");  fits_report_error(stderr,status); exit(1);}
-  fits_read_key(dSet->fp,TFLOAT,"TBIN",&(dSet->head->tsamp),NULL,&status);
-  if (status) {printf("Error reading tbin ... trying to continue\n");  fits_report_error(stderr,status); status=0;}
+
+  fits_read_key(dSet->fp,TSTRING,"NSBLK",strTmp,NULL,&status);
+  if (strcmp(strTmp,"*")==0)
+    printf("Warning: NBSBLK is not set\n");
+  else
+    {
+      fits_read_key(dSet->fp,TINT,"NSBLK",&(dSet->head->nsblk),NULL,&status);
+      if (status) {printf("\n\n****** Error reading NSBLK ... trying to continue\n");  fits_report_error(stderr,status); status=0;}
+    }
+
+  fits_read_key(dSet->fp,TSTRING,"TBIN",strTmp,NULL,&status);
+  if (strcmp(strTmp,"*")==0)
+    printf("Warning: TBIN is not set\n");
+  else
+    {
+      fits_read_key(dSet->fp,TFLOAT,"TBIN",&(dSet->head->tsamp),NULL,&status);
+      if (status) {printf("\n\n**** Error reading tbin ... trying to continue\n");  fits_report_error(stderr,status); status=0;}
+    }
+
+
   fits_read_key(dSet->fp,TFLOAT,"CHAN_BW",&(dSet->head->chanbw),NULL,&status);
   if (status) {printf("pos 2\n");  fits_report_error(stderr,status); exit(1);}
   fits_read_key(dSet->fp,TINT,"NBIN",&(dSet->head->nbin),NULL,&status);
   if (status) {printf("error with nbin\n");  fits_report_error(stderr,status); exit(1);}
-      
+
   // Read the frequency channels
   fits_get_colnum(dSet->fp,CASEINSEN,"DAT_FREQ",&colnum,&status);  
-  printf("Reading\n");
   fits_read_col_flt(dSet->fp,colnum,1,1,dSet->head->nchan,nval,dSet->head->chanFreq,&initFlag,&status);
   if (status) {printf("pos 3\n");  fits_report_error(stderr,status); exit(1);}
 	

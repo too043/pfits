@@ -16,7 +16,7 @@
 void calcMinMax(float *timeAve,int nbin,int nchan,float *minVal,float *maxVal,int *imax,int showSub,int selectSB,float f0,float chanbw,int type);
 void saveFile(float *datWts, int nsub, int nchan,dSetStruct *dSet,int autoRun);
 void get_dm_tbin(dSetStruct *dSet,double *dm,double *tbin);
-void formFrequencyTimeAverages(int nsub,int nchan,int nbin,double dm,double tbin,float fref,float *fChan,float *loadAll_pol1,float *loadAll_pol2,float *timeAve,float *freqAve,float *profile,float *datWts,int doDM,int subNum,int selectSB,float f0,float chanbw);
+void formFrequencyTimeAverages(int nsub,int nchan,int nbin,double dm,double tbin,float fref,float *fChan,float *loadAll_pol1,float *loadAll_pol2,float *timeAve,float *freqAve,float *profile,float *datWts,int doDM,int subNum,int selectSB,float f0,float chanbw,int npol);
 void help();
 void displayZapCommand(int *zapFreq,int nchan,int *zapSub,int nsub,float *fChan,char *fname);
 int modOp(int a,int b);
@@ -210,6 +210,12 @@ int main(int argc,char *argv[])
   float fs[MAX_ZAP_LIST],fe[MAX_ZAP_LIST];
   int  nZapList=0;
   FILE *fin;
+
+  float fval0,fval1;
+  int nz=0;
+  float zapF0[1024],zapF1[1024];
+  
+
   
   // Initialise everything
   initialise(&dSet,debug);
@@ -335,27 +341,30 @@ int main(int argc,char *argv[])
 	}
       
       // Polarisation 2
-      polNum=1;
-      fits_read_col(dSet->fp,TFLOAT,colnum_datOffs,ii+1,1+polNum*nchan,nchan,&n_fval,datOffs+ii*nchan,&initflag,&status);
-      fits_read_col(dSet->fp,TFLOAT,colnum_datScl,ii+1,1+polNum*nchan,nchan,&n_fval,datScl+ii*nchan,&initflag,&status);
-      // Don't need to read the weights as not polarisation dependent
-      fits_read_col(dSet->fp,TSHORT,colnum_data,ii+1,1+polNum*nchan*nbin,nchan*nbin,&n_val,sval,&initflag,&status);
-
-      for (kk=0;kk<nchan;kk++)
+      if (npol > 1)
 	{
-	  mean2=0;
-	  for (jj=0;jj<nbin;jj++)
+	  polNum=1;
+	  fits_read_col(dSet->fp,TFLOAT,colnum_datOffs,ii+1,1+polNum*nchan,nchan,&n_fval,datOffs+ii*nchan,&initflag,&status);
+	  fits_read_col(dSet->fp,TFLOAT,colnum_datScl,ii+1,1+polNum*nchan,nchan,&n_fval,datScl+ii*nchan,&initflag,&status);
+	  // Don't need to read the weights as not polarisation dependent
+	  fits_read_col(dSet->fp,TSHORT,colnum_data,ii+1,1+polNum*nchan*nbin,nchan*nbin,&n_val,sval,&initflag,&status);
+	  
+	  for (kk=0;kk<nchan;kk++)
 	    {
- 	      val = (sval[kk*nbin+jj]*datScl[ii*nchan+kk]+datOffs[ii*nchan+kk]);
-	      loadAll_pol2[ii*nbin*nchan+kk*nbin+jj] = val;
-	      mean2+=val;
-	    }	      
-	  for (jj=0;jj<nbin;jj++)
-	    loadAll_pol2[ii*nbin*nchan+kk*nbin+jj] -= mean2/(double)nbin;
+	      mean2=0;
+	      for (jj=0;jj<nbin;jj++)
+		{
+		  val = (sval[kk*nbin+jj]*datScl[ii*nchan+kk]+datOffs[ii*nchan+kk]);
+		  loadAll_pol2[ii*nbin*nchan+kk*nbin+jj] = val;
+		  mean2+=val;
+		}	      
+	      for (jj=0;jj<nbin;jj++)
+		loadAll_pol2[ii*nbin*nchan+kk*nbin+jj] -= mean2/(double)nbin;
+	    }
 	}
     }
 
-  formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+  formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
   printf("Completed loading all data\n");
   
   // Get minimum and maximum values
@@ -583,7 +592,10 @@ int main(int argc,char *argv[])
 		    nk=0;
 		    for (kk=b0;kk<b1;kk++)
 		      {
-			b[nk] = loadAll_pol1[jj*nbin*nchan+ii*nbin+kk]+loadAll_pol2[jj*nbin*nchan+ii*nbin+kk];
+			if (npol==1)
+			  b[nk] = loadAll_pol1[jj*nbin*nchan+ii*nbin+kk];
+			else
+			  b[nk] = loadAll_pol1[jj*nbin*nchan+ii*nbin+kk]+loadAll_pol2[jj*nbin*nchan+ii*nbin+kk];
 			if (nk==0)
 			  maxVal=minVal=b[nk];
 			s1+=b[nk];
@@ -618,7 +630,7 @@ int main(int argc,char *argv[])
 		  }
 		  
 	      }
-	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 	    
 	    // Get minimum and maximum values
 	    calcMinMax(freqAve,nbin,nsub,&minVal_freqAve,&maxVal_freqAve,&imaxVal_freqAve,showSub,selectSB,f0,chanbw,1);
@@ -651,7 +663,10 @@ int main(int argc,char *argv[])
 			
 			for (kk=0;kk<nbin;kk++)
 			  {
-			    b[kk] = loadAll_pol1[jj*nbin*nchan+iclose*nbin+kk]+loadAll_pol2[jj*nbin*nchan+iclose*nbin+kk];
+			    if (npol==1)
+			      b[kk] = loadAll_pol1[jj*nbin*nchan+iclose*nbin+kk];
+			    else
+			      b[kk] = loadAll_pol1[jj*nbin*nchan+iclose*nbin+kk]+loadAll_pol2[jj*nbin*nchan+iclose*nbin+kk];
 			    if (kk==0)
 			      {
 				maxVal = b[kk];
@@ -733,7 +748,7 @@ int main(int argc,char *argv[])
 	  help();
 	else if (key=='r')
 	  {
-	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 	    calcMinMax(freqAve,nbin,nsub,&minVal_freqAve,&maxVal_freqAve,&imaxVal_freqAve,showSub,selectSB,f0,chanbw,1);
 	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
 	    calcMinMax(profile,nbin,1,&minVal_profile,&maxVal_profile,&imaxVal_profile,showSub,selectSB,f0,chanbw,3);
@@ -741,6 +756,7 @@ int main(int argc,char *argv[])
 	  }
 	else if (key=='m')
 	  {
+	    autoScale=0;
 	    if (plotType==1)printf("Current maximum value is %g\n",maxVal_timeAve);
 	    else if (plotType==2)printf("Current maximum value is %g\n",maxVal_freqAve);
 	    printf("Please enter new maximum value ");
@@ -761,13 +777,13 @@ int main(int argc,char *argv[])
 	    }
 
 	  if (didDelete==1)
-	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 	  didDelete=0;
 	}
 	else if (key=='2') {
 	  plotType=2;   minx = 0;  maxx = nbin;  miny = 0;  maxy = nsub+1;
 	  //	  if (didDelete==1)
-	  formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+	  formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 	  calcMinMax(freqAve,nbin,nsub,&minVal_freqAve,&maxVal_freqAve,&imaxVal_freqAve,showSub,selectSB,f0,chanbw,1);
 	  calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
 	  calcMinMax(profile,nbin,1,&minVal_profile,&maxVal_profile,&imaxVal_profile,showSub,selectSB,f0,chanbw,3);		
@@ -777,7 +793,7 @@ int main(int argc,char *argv[])
 	else if (key=='3') {
 	  plotType=3;   minx = 0;  maxx = nbin;  miny = minVal_profile;  maxy = maxVal_profile;
 	  if (didDelete==1)
-	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 	  didDelete=0;
 	}
 	else if (key=='p')
@@ -807,6 +823,255 @@ int main(int argc,char *argv[])
 		  { miny = minVal_profile; maxy = maxVal_profile; minx = 0; maxx = nbin;}
 	      }
 	  }
+	else if (key=='!') // Remove persistent RFI
+	  {
+	    nz=0;
+	    zapF0[nz] = 758; zapF1[nz++] = 768;
+	    zapF0[nz] = 768; zapF1[nz++] = 788;
+	    zapF0[nz] = 869.95; zapF1[nz++] = 875.05;
+	    zapF0[nz] = 875.05; zapF1[nz++] = 889.95;
+	    zapF0[nz] = 943.4; zapF1[nz++] = 951.8;
+	    zapF0[nz] = 953.7; zapF1[nz++] = 958.7;
+	    zapF0[nz] = 1805; zapF1[nz++] = 1825;
+	    zapF0[nz] = 1845; zapF1[nz++] = 1865;
+	    zapF0[nz] = 2110; zapF1[nz++] = 2120;
+	    zapF0[nz] = 2140; zapF1[nz++] = 2145;
+	    zapF0[nz] = 2145; zapF1[nz++] = 2150;
+	    zapF0[nz] = 2164.9; zapF1[nz++] = 2170.1;
+	    zapF0[nz] = 2670; zapF1[nz++] = 2690;
+	    zapF0[nz] = 1081.7; zapF1[nz++] = 1086.7;
+	    zapF0[nz] = 1720; zapF1[nz++] = 1736.2;
+	    zapF0[nz] = 1973.7; zapF1[nz++] = 1991.0;
+
+	    // NBN transmissions
+	    zapF0[nz] = 2302.05; zapF1[nz++] = 2321.95;
+	    zapF0[nz] = 2322.05; zapF1[nz++] = 2341.95;
+	    zapF0[nz] = 2342.05; zapF1[nz++] = 2361.95;
+	    zapF0[nz] = 2362.05; zapF1[nz++] = 2381.95;
+	    zapF0[nz] = 3445.05; zapF1[nz++] = 3464.95;
+	    zapF0[nz] = 3550.05; zapF1[nz++] = 3569.95;
+	    zapF0[nz] = 2487; zapF1[nz++] = 2496;
+
+	    // 920 MHz signal
+	    zapF0[nz] = 915; zapF1[nz++] = 928;
+
+	    // Signals from the digitisers
+	    zapF0[nz] = 1023;   zapF1[nz++] = 1025;
+	    zapF0[nz] = 1919.9; zapF1[nz++] = 1920.1;
+	    zapF0[nz] = 3071.9; zapF1[nz++] = 3072.05;
+
+	    // Parkes radar
+	    zapF0[nz] = 1017; zapF1[nz++] = 1019;
+
+	    // Persistent satellite signals
+	    zapF0[nz] = 1618; zapF1[nz++] = 1626.5; // Iridium
+
+	    // +/- 5% of band edges
+	    for (i=0;i<26;i++)
+	      {
+		zapF0[nz] = 704+128*i-5.*128./100;
+		zapF1[nz++] = 704+128*i+5.*128./100;
+	      }
+	    
+	    for (i=0;i<nz;i++)
+	      {
+		fval0 = zapF0[i];
+		fval1 = zapF1[i];
+		for (j=(int)((fval0-f0)/chanbw+1);j<(int)((fval1-f0)/chanbw+1);j++)
+		  {
+		    if (j>=miny && j<=maxy)
+		      {
+			zapFreq[j] = 1;
+			
+			for (jj=0;jj<nsub;jj++)
+			  datWts[jj*nchan+j] = 0;
+			for (jj=0;jj<nbin;jj++)
+			  timeAve[j*nbin+jj] = 0;
+		      }
+		  }
+	      }
+
+	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
+
+	  }
+	else if (key=='@') // Remove WiFi
+	  {
+	    nz=0;
+	    zapF0[nz] = 2401; zapF1[nz++] = 2483;
+	    for (i=0;i<nz;i++)
+	      {
+		fval0 = zapF0[i];
+		fval1 = zapF1[i];
+		for (j=(int)((fval0-f0)/chanbw+1);j<(int)((fval1-f0)/chanbw+1);j++)
+		  {
+		    if (j>=miny && j<=maxy)
+		      {
+			zapFreq[j] = 1;
+			
+			for (jj=0;jj<nsub;jj++)
+			  datWts[jj*nchan+j] = 0;
+			for (jj=0;jj<nbin;jj++)
+			  timeAve[j*nbin+jj] = 0;
+		      }
+		  }
+	      }
+
+	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
+
+	  }
+	else if (key=='#') // Remove handsets
+	  {
+	    nz=0;
+	    zapF0[nz] = 703; zapF1[nz++] = 713;
+	    zapF0[nz] = 713; zapF1[nz++] = 733;
+	    
+	    zapF0[nz] = 825.1; zapF1[nz++] = 829.9;
+	    zapF0[nz] = 830.05; zapF1[nz++] = 844.95;
+	    zapF0[nz] = 847.6; zapF1[nz++] = 848.0;
+
+	    // Aliases --check the bands
+	    zapF0[nz] = 704.5; zapF1[nz++] = 708;
+	    zapF0[nz] = 953; zapF1[nz++] = 960.1; // CHECK THIS ONE
+	    
+	    for (i=0;i<nz;i++)
+	      {
+		fval0 = zapF0[i];
+		fval1 = zapF1[i];
+		for (j=(int)((fval0-f0)/chanbw+1);j<(int)((fval1-f0)/chanbw+1);j++)
+		  {
+		    if (j>=miny && j<=maxy)
+		      {
+			zapFreq[j] = 1;
+			
+			for (jj=0;jj<nsub;jj++)
+			  datWts[jj*nchan+j] = 0;
+			for (jj=0;jj<nbin;jj++)
+			  timeAve[j*nbin+jj] = 0;
+		      }
+		  }
+	      }
+
+	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
+
+	  }
+	else if (key=='$') // Remove sallite bands
+	  {
+	    nz=0;
+	    zapF0[nz] = 1164; zapF1[nz++] = 1189;
+	    zapF0[nz] = 1189; zapF1[nz++] = 1214;
+	    zapF0[nz] = 1240; zapF1[nz++] = 1260;
+	    zapF0[nz] = 1260; zapF1[nz++] = 1300;
+	    
+	    zapF0[nz] = 1525; zapF1[nz++] = 1646.5; // Inmarsat -- THIS IS TOO WIDE!
+	    
+	    for (i=0;i<nz;i++)
+	      {
+		fval0 = zapF0[i];
+		fval1 = zapF1[i];
+		for (j=(int)((fval0-f0)/chanbw+1);j<(int)((fval1-f0)/chanbw+1);j++)
+		  {
+		    if (j>=miny && j<=maxy)
+		      {
+			zapFreq[j] = 1;
+			
+			for (jj=0;jj<nsub;jj++)
+			  datWts[jj*nchan+j] = 0;
+			for (jj=0;jj<nbin;jj++)
+			  timeAve[j*nbin+jj] = 0;
+		      }
+		  }
+	      }
+
+	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
+
+	  }
+	else if (key=='%') // Remove DME and other aircraft signals
+	  {
+	    nz=0;
+	    zapF0[nz] = 1089.5; zapF1[nz++] = 1090.5; // ADS-B
+
+	    for (i=0;i<nz;i++)
+	      {
+		fval0 = zapF0[i];
+		fval1 = zapF1[i];
+		for (j=(int)((fval0-f0)/chanbw+1);j<(int)((fval1-f0)/chanbw+1);j++)
+		  {
+		    if (j>=miny && j<=maxy)
+		      {
+			zapFreq[j] = 1;
+			
+			for (jj=0;jj<nsub;jj++)
+			  datWts[jj*nchan+j] = 0;
+			for (jj=0;jj<nbin;jj++)
+			  timeAve[j*nbin+jj] = 0;
+		      }
+		  }
+	      }
+
+	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
+
+	  }
+	else if (key=='x') // Remove known RFI signals
+	  {
+	    int j;
+	    nz=0;
+
+	    zapF0[nz] = 727; zapF1[nz++] = 733;
+	    zapF0[nz] = 757; zapF1[nz++] = 788;
+	    zapF0[nz] = 867; zapF1[nz++] = 890;
+	    zapF0[nz] = 943; zapF1[nz++] = 959;
+	    zapF0[nz] = 960; zapF1[nz++] = 964;
+	    zapF0[nz] = 1017; zapF1[nz++] = 1019;
+	    zapF0[nz] = 1148; zapF1[nz++] = 1151;
+	    zapF0[nz] = 1173; zapF1[nz++] = 1178;
+	    zapF0[nz] = 1627; zapF1[nz++] = 1628;
+	    zapF0[nz] = 1805; zapF1[nz++] = 1825;
+	    zapF0[nz] = 1845; zapF1[nz++] = 1864;
+	    zapF0[nz] = 2140; zapF1[nz++] = 2150;
+	    zapF0[nz] = 2238; zapF1[nz++] = 2245;
+	    zapF0[nz] = 2343; zapF1[nz++] = 2361;
+	    zapF0[nz] = 2671; zapF1[nz++] = 2689;
+	    
+ 	    for (i=0;i<=26;i++)
+	      {
+		fval0 = 704 + i*128 - 0.05*128;
+		fval1 = 704 + i*128 + 0.05*128;
+		for (j=(int)((fval0-f0)/chanbw+1);j<(int)((fval1-f0)/chanbw+1);j++)
+		  {
+		    if (j>=miny && j<=maxy && j >= 0 && j < nchan)
+		      {
+			zapFreq[j] = 1;
+			
+			for (jj=0;jj<nsub;jj++)
+			  datWts[jj*nchan+j] = 0;
+			for (jj=0;jj<nbin;jj++)
+			  timeAve[j*nbin+jj] = 0;
+		      }
+		  }
+	      }
+
+ 	    for (i=0;i<nz;i++)
+	      {
+		fval0 = zapF0[i];
+		fval1 = zapF1[i];
+		for (j=(int)((fval0-f0)/chanbw+1);j<(int)((fval1-f0)/chanbw+1);j++)
+		  {
+		    if (j>=miny && j<=maxy)
+		      {
+			zapFreq[j] = 1;
+			
+			for (jj=0;jj<nsub;jj++)
+			  datWts[jj*nchan+j] = 0;
+			for (jj=0;jj<nbin;jj++)
+			  timeAve[j*nbin+jj] = 0;
+		      }
+		  }
+	      }
+
+	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
+	       
+
+	  }
 	else if (key=='X' && plotType==1)
 	  {
 	    int zapChannel;
@@ -819,7 +1084,7 @@ int main(int argc,char *argv[])
 	    
 	    for (jj=0;jj<nbin;jj++)
 	      timeAve[zapChannel*nbin+jj] = 0;
-	    //	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);	    
+	    //	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);	    
 	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
 	    printf("Minimum value = %g, maximum value = %g, channel number for maximum value = %d plotType=1\n",minVal_timeAve,maxVal_timeAve,imaxVal_timeAve);
 	  }
@@ -856,7 +1121,7 @@ int main(int argc,char *argv[])
 		    maxy = i1;
 		  }
 		else
-		  formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+		  formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 		calcMinMax(freqAve,nbin,nsub,&minVal_freqAve,&maxVal_freqAve,&imaxVal_freqAve,showSub,selectSB,f0,chanbw,1);
 		calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
 		calcMinMax(profile,nbin,1,&minVal_profile,&maxVal_profile,&imaxVal_profile,showSub,selectSB,f0,chanbw,3);		
@@ -870,7 +1135,7 @@ int main(int argc,char *argv[])
 		    miny = 0;
 		    maxy = nchan;
 		  }
-		formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+		formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 		calcMinMax(freqAve,nbin,nsub,&minVal_freqAve,&maxVal_freqAve,&imaxVal_freqAve,showSub,selectSB,f0,chanbw,1);
 		calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
 		calcMinMax(profile,nbin,1,&minVal_profile,&maxVal_profile,&imaxVal_profile,showSub,selectSB,f0,chanbw,3);		
@@ -906,7 +1171,7 @@ int main(int argc,char *argv[])
 	    else
 	      showSub=0;
 	    
-	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 		// Get minimum and maximum values
 	    calcMinMax(freqAve,nbin,nsub,&minVal_freqAve,&maxVal_freqAve,&imaxVal_freqAve,showSub,selectSB,f0,chanbw,1);
 	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
@@ -917,7 +1182,7 @@ int main(int argc,char *argv[])
 	  {
 	    showSub++;
 	    if (showSub == nsub) showSub=nsub-1;
-	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 		// Get minimum and maximum values
 	    calcMinMax(freqAve,nbin,nsub,&minVal_freqAve,&maxVal_freqAve,&imaxVal_freqAve,showSub,selectSB,f0,chanbw,1);
 	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
@@ -928,7 +1193,7 @@ int main(int argc,char *argv[])
 	  {
 	    showSub--;
 	    if (showSub < 0) showSub=0;
-	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 		// Get minimum and maximum values
 	    calcMinMax(freqAve,nbin,nsub,&minVal_freqAve,&maxVal_freqAve,&imaxVal_freqAve,showSub,selectSB,f0,chanbw,1);
 	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
@@ -995,7 +1260,7 @@ int main(int argc,char *argv[])
 		  }
 	      }
 	    
-	    //	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw);
+	    //	    formFrequencyTimeAverages(nsub,nchan,nbin,dm,tbin,fref,fChan,loadAll_pol1,loadAll_pol2,timeAve,freqAve,profile,datWts,doDM,showSub,selectSB,f0,chanbw,npol);
 	    calcMinMax(timeAve,nbin,nchan,&minVal_timeAve,&maxVal_timeAve,&imaxVal_timeAve,showSub,selectSB,f0,chanbw,2);
 	    printf("Minimum value = %g, maximum value = %g, channel number for maximum value = %d plotType=1\n",minVal_timeAve,maxVal_timeAve,imaxVal_timeAve);
 	  }
@@ -1170,7 +1435,7 @@ void get_dm_tbin(dSetStruct *dSet,double *dm,double *tbin)
   printf("Loaded TBIN = %g\n",*tbin);
 }
 
-void formFrequencyTimeAverages(int nsub,int nchan,int nbin,double dm,double tbin,float fref,float *fChan,float *loadAll_pol1,float *loadAll_pol2,float *timeAve,float *freqAve,float *profile,float *datWts,int doDM,int showSub,int selectSB,float f0,float chanbw)
+void formFrequencyTimeAverages(int nsub,int nchan,int nbin,double dm,double tbin,float fref,float *fChan,float *loadAll_pol1,float *loadAll_pol2,float *timeAve,float *freqAve,float *profile,float *datWts,int doDM,int showSub,int selectSB,float f0,float chanbw,int npol)
 {
   long int ii,jj,kk;
   double tdiff;
@@ -1246,11 +1511,20 @@ void formFrequencyTimeAverages(int nsub,int nchan,int nbin,double dm,double tbin
 		      //		  dedispBin = jj+binOff;
 		      //
 		      //		  while (dedispBin >= nbin) dedispBin-=nbin; // DO THIS BETTER
-		      timeAve[(kk)*nbin+dedispBin] += (loadAll_pol1[(ii)*nbin*nchan+kk*nbin+jj]+loadAll_pol2[(ii)*nbin*nchan+kk*nbin+jj]);
-		      freqAve[(ii)*nbin+dedispBin] += (loadAll_pol1[(ii)*nbin*nchan+kk*nbin+jj]+loadAll_pol2[(ii)*nbin*nchan+kk*nbin+jj]);
-		      //		  if (selectSB == 1)
+		      if (npol==1)
+			{
+			  timeAve[(kk)*nbin+dedispBin] += (loadAll_pol1[(ii)*nbin*nchan+kk*nbin+jj]);
+			  freqAve[(ii)*nbin+dedispBin] += (loadAll_pol1[(ii)*nbin*nchan+kk*nbin+jj]);
+			  profile[dedispBin] += (loadAll_pol1[(ii)*nbin*nchan+kk*nbin+jj]);	      
+			}
+		      else
+			{
+			  timeAve[(kk)*nbin+dedispBin] += (loadAll_pol1[(ii)*nbin*nchan+kk*nbin+jj]+loadAll_pol2[(ii)*nbin*nchan+kk*nbin+jj]);
+			  freqAve[(ii)*nbin+dedispBin] += (loadAll_pol1[(ii)*nbin*nchan+kk*nbin+jj]+loadAll_pol2[(ii)*nbin*nchan+kk*nbin+jj]);
+			  profile[dedispBin] += (loadAll_pol1[(ii)*nbin*nchan+kk*nbin+jj]+loadAll_pol2[(ii)*nbin*nchan+kk*nbin+jj]);	      
+			}
+			  //		  if (selectSB == 1)
 		      //		    printf("Setting: %d %d %d %g\n",ii,jj,kk,timeAve[(kk-kk0)*nbin+dedispBin]);
-		      profile[dedispBin] += (loadAll_pol1[(ii)*nbin*nchan+kk*nbin+jj]+loadAll_pol2[(ii)*nbin*nchan+kk*nbin+jj]);	      
 		    }
 		}
 	    }

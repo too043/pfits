@@ -27,6 +27,7 @@ int main(int argc,char *argv[])
 {
   dSetStruct *dSet;
   int debug=0;
+  int plot=0;
   int status=0;
   int i,j;
   float *data;
@@ -47,7 +48,8 @@ int main(int argc,char *argv[])
   FILE *fout;
   FILE *fout_ts;
   FILE *fout_samp;
-  
+  char grDev[128]="/xs";
+    
   sub0 = 0;
   sub1 = 1;
   
@@ -67,6 +69,11 @@ int main(int argc,char *argv[])
 	sscanf(argv[++i],"%d",&pol);
       else if (strcmp(argv[i],"-noScale")==0)
 	applyScaling=0;
+      else if (strcmp(argv[i],"-g")==0)
+	{
+	  plot=1;
+	  strcpy(grDev,argv[++i]);
+	}
     }
 
   pfitsOpenFile(dSet,debug);
@@ -146,8 +153,37 @@ int main(int argc,char *argv[])
   fout = fopen("output.dat","w");
   for (i=0;i<dSet->head->nchan;i++)
     {
-      fprintf(fout,"%d %g %g %g %g spectrum\n",i,dSet->head->chanFreq[i],sum[i]/(double)totCount,max[i],min[i]);
+      sum[i]/=(double)totCount;
+      fprintf(fout,"%d %g %g %g %g spectrum\n",i,dSet->head->chanFreq[i],sum[i],max[i],min[i]);
+      sum[i]=log10(sum[i]);
     }
+  if (plot==1)
+    {
+      cpgbeg(0,grDev,1,1);
+      cpgslw(2);
+      cpgscf(2);
+      cpgsvp(0.10,0.95,0.10,0.35);
+      cpgswin(704,1344,2,9.6);
+      cpgbox("ABCTSN",0,0,"ABCTSNL",0,0);
+      cpglab("Frequency (MHz)","","");
+      cpgline(dSet->head->nchan,dSet->head->chanFreq,sum);
+
+      cpgsvp(0.10,0.95,0.40,0.65);
+      //	cpgswin(1344,2368,miny,maxy);
+      cpgswin(1344,2368,3,8);
+      cpgbox("ABCTSN",0,0,"ABCTSNL",0,0);
+      cpglab("","Signal strength","");
+      cpgline(dSet->head->nchan,dSet->head->chanFreq,sum);
+      
+      cpgsvp(0.10,0.95,0.7,0.95);
+      //	cpgswin(2368,4096,miny,maxy);
+      cpgswin(2368,4096,3,8);
+      cpgbox("ABCTNS",0,0,"ABCTSNL",0,0);
+      cpgline(dSet->head->nchan,dSet->head->chanFreq,sum);
+      cpgend();
+    }
+
+  
   fclose(fout);
   free(data);
   free(max);
