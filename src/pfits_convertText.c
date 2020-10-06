@@ -31,7 +31,8 @@ int main(int argc,char *argv[])
   float *dataVals;
   FILE *fout;
   long s1=0,s2=0;
-  
+  int offsScl=0;
+
   // Allocate memory for these files
   dSet = (dSetStruct *)malloc(sizeof(dSetStruct));
   
@@ -59,7 +60,7 @@ int main(int argc,char *argv[])
   for (i=s1;i<s2;i++)
     {
       printf("Subintegration %d\n",i);
-      pfits_read1pol_float(dataVals,0,dSet,i,i,1,&nSamp,&nTime,&nFreq,debug);
+      pfits_read1pol_float(dataVals,0,dSet,i,i,1,&nSamp,&nTime,&nFreq,debug,&offsScl);
       for (j=0;j<nTime;j++)
 	{
 	  for (k=0;k<nFreq;k++)
