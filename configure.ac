@@ -6,7 +6,7 @@
 AC_PREREQ(2.61)
 
 # This is where the version information is set
-AC_INIT([PFITS], [0.1], [andrew.jameson@gmail.com])
+AC_INIT([PFITS], [0.2], [george.hobbs@csiro.au])
 
 AC_CONFIG_MACRO_DIR(config)
 
@@ -25,6 +25,7 @@ AC_PROG_LIBTOOL
 
 # Checks for libraries.
 SWIN_LIB_CFITSIO
+SWIN_LIB_FFTW
 SWIN_LIB_PGPLOT
 
 AC_CONFIG_FILES([
