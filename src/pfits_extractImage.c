@@ -90,6 +90,8 @@ int main(int argc,char *argv[])
   float modulationIndex = 1;
   float checkPercent;
   float acfScale = 0.2;
+  int offsScl=0;
+    
     // Initialise everything
   initialise(&dSet,debug);
 
@@ -210,7 +212,7 @@ int main(int argc,char *argv[])
 
   printf("nbits = %d\n",dSet->head->nbits);
   printf("subint = %d\n",subint);
-  pfits_read1pol_float(loadData,0,dSet,(float)subint,(float)subint,1,&nSamples,&nTimeSamples,&nFrequencySamples,debug);
+  pfits_read1pol_float(loadData,0,dSet,(float)subint,(float)subint,1,&nSamples,&nTimeSamples,&nFrequencySamples,debug,offsScl);
   printf("Have loaded %d %d samples \n",nTimeSamples,nFrequencySamples);
   fout = fopen(outFile,"w");
   for (k=0;k<nFrequencySamples;k++)

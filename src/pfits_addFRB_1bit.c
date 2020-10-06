@@ -199,7 +199,7 @@ int main(int argc,char *argv[])
 	      if (process==0)
 		{
 		  //		  printf("Loading samples for subint %d\n",i);
-		  pfits_read1pol_float(loadData,0,dSet,i,i,1,&nSamples,&nTimeSamples,&nFrequencySamples,debug,&offsScl);
+		  pfits_read1pol_float(loadData,0,dSet,i,i,1,&nSamples,&nTimeSamples,&nFrequencySamples,debug,offsScl);
 		  //		  printf("Loaded sampled: %d\n",nSamples);
 	      	  for (j=0;j<nSamples;j++)
 		    out[j] = (unsigned char)loadData[j];
