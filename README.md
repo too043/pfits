@@ -1,9 +1,13 @@
 # pfits
 ---
 Author:    George.Hobbs@csiro.au  
-Copyright: CSIRO 2019 
+Copyright: CSIRO 2020 
 
 **pfits** is a software package to read, manipulate and process PSRFITS format search- and fold-mode pulsar astronomy data files 
+
+## Dependencies
+cfitsio
+pgplot
 
 ## Compile
 ./bootstrap  
@@ -47,54 +51,52 @@ the user can select a time range, or nsamp range, or subint range. If > N points
 + a new PSRFITS file is output
 + the option to output multiple dispersed data files if requested
 
-### pfits_fold
-
-+ folds a search mode file with a given pulse period or using a tempo2 predictor
-+ outputs a new PSRFITS fold-mode file
-
-### pfits_singlepulse
-
-+ extracts single pulses from a search mode file
-+ can output PSRFITS fold-mode files for each pulse or calculate various parameters (e.g., flux density) and output those instead
-
-### pfits_makeSpectrum
-### pfitsUtil_copyToNew
-### pfits_addFRB_1bit   
-### pfits_makeTimeMovie
-### pfitsUtil_createFoldTemplate
+### fitsProcess
 ### pfits_addFRB
-### pfits_merge
-### pfitsUtil_foldmode_combineFreq
-### pfits_output
-### pfitsUtil_foldmode_combineTime
+### pfits_addFRB_1bit
 ### pfits_cal
-### pfitsUtil_foldmode_extractFreq
 ### pfits_change
+### pfits_convertText
+### pfits_extract1bit
+### pfits_extractImage
+### pfits_fftSearch
+### pfits_fluxcal
+### pfits_foldStatistics
+### pfits_formBandpass
+### pfits_frb
+### pfits_getZeroDM
+### pfits_imageFold
+### pfits_makeImages
+### pfits_makeMovie
+### pfits_makeSpectrum
+### pfits_makeTimeMovie
+### pfits_merge
+### pfits_output
+### pfits_output1
 ### pfits_outValues
+### pfits_plotfold
+### pfits_plotsearch
+### pfits_read_1bitExtraction
+### pfits_searchMode_offScls
+### pfits_sim
+### pfits_sim1
+### pfits_simRealData
+### pfits_statistics
+### pfits_studyRFI
+### pfitsUtil_copyToNew
+### pfitsUtil_createFoldTemplate
+### pfitsUtil_foldmode_combineFreq
+### pfitsUtil_foldmode_combineTime
+### pfitsUtil_foldmode_extractFreq
 ### pfitsUtil_foldmode_extractTime
-### pfits_convertText    
 ### pfitsUtil_foldmode_useTemplate
 ### pfitsUtil_headerInformation
-### pfits_plotfold  
 ### pfitsUtil_searchmode_combineFreq
-### pfits_extract1bit
-### pfits_plotsearch           
 ### pfitsUtil_searchmode_combineTime
-### pfits_extractImage
 ### pfitsUtil_searchmode_extractFreq
-### pfits_fftSearch
-### pfits_pulseExtraction      
 ### pfitsUtil_searchMode_extractPart
-### pfits_frb
-### pfits_read_1bitExtraction
+### pfitsUtil_searchmode_filter
 ### pfitsUtil_updateMetaData
 ### pfits_zapProfile
-### pfits_getZeroDM                 
-### pfits_loader
-### pfits_sim
 ### pfits_zapUWL
-### pfits_makeImages
-### pfits_simRealData
-### pfits_makeMovie
-### pfits_statistics
-
+### pfits_zapUWL_auto
