@@ -56,7 +56,7 @@ int main(int argc,char *argv[])
   long nalloc;
   float fx[4096],fy[4096];
   float miny,maxy;
-  float fref;
+  float fref=-1;
   float pos0,tdiff;
   int nDedispSamp;
   int idiff;
@@ -124,6 +124,8 @@ int main(int argc,char *argv[])
 	sscanf(argv[++i],"%f",&maxVal);
       else if (strcmp(argv[i],"-stats")==0)
 	stats=1;
+      else if (strcmp(argv[i],"-fref")==0)
+	sscanf(argv[++i],"%f",&fref);
       else if (strcmp(argv[i],"-g")==0)
 	strcpy(grDev,argv[++i]);
       else if (strcmp(argv[i],"-o")==0)
@@ -140,22 +142,25 @@ int main(int argc,char *argv[])
   printf("Nchan = %d\n",dSet->head->nchan);
   nchan = dSet->head->nchan;
   nsblk = dSet->head->nsblk;
-
-  fref = (dSet->head->chanFreq[0]+dSet->head->chanFreq[dSet->head->nchan-1])/2.0;
-  tdiff = 4.15e-3*dm*(pow(fref/1000.0,-2)-pow(dSet->head->chanFreq[0]/1000.0,-2));
-  tdispCentre = frbTime + tdiff;
+  printf("nchan d = %d\n",(int)dSet->head->nchan);
+  if (fref==-1)
+    fref = (dSet->head->chanFreq[0]+dSet->head->chanFreq[dSet->head->nchan-1])/2.0;
+  //  tdiff = 4.15e-3*dm*(pow(fref/1000.0,-2)-pow(dSet->head->chanFreq[0]/1000.0,-2));
+  tdispCentre = frbTime; // + tdiff;
+  printf("Reference frequency = %g\n",fref);
   
   t1 = tdispCentre-plotWidth/2.0;
   t2 = tdispCentre+plotWidth/2.0;
 
 
-
-  nalloc = (int)((float)((t2-t1)*nchan/dSet->head->tsamp) + 1000);
-  printf("Allocation %d\n",nalloc);
+  nalloc = (int)((float)((t2-t1)*nchan/dSet->head->tsamp) + 10000);
   plotArr = (float *)malloc(sizeof(float)*nalloc);
   plotArr2 = (float *)malloc(sizeof(float)*nalloc);
-  plotArrBin = (float *)malloc(sizeof(float)*nalloc);
-
+  if (!(plotArrBin = (float *)malloc(sizeof(float)*nalloc)))
+    {
+      printf("UNABLE TO ALLOCATE MEMORY\n");
+      exit(1);
+    }
   pfits_read1pol_float(plotArr,0,dSet,t1,t2,3,&nSamples,&nTimeSamples,&nFreqSamples,1,0);    
   if (flip==1)
     {
@@ -180,44 +185,53 @@ int main(int argc,char *argv[])
       cpgslw(2);
       cpgscf(2);
       nDedispSamp = (int)(tdispWidth/dSet->head->tsamp);
-
-
+      /*
+      printf("nDedispSamp = %d\n",nDedispSamp);
+      printf("nchan = %d\n",(int)dSet->head->nchan);
+      printf("nTimeSamples = %d\n",nTimeSamples);
+      printf("nbin = %d\n",nbin);
+      */
       for (i=0;i<dSet->head->nchan;i++)
 	{
 	  for (j=0;j<nTimeSamples/nbin;j++)
 	    {
+	      //	      printf("j = %d -- adding at %d %d\n",j,j*dSet->head->nchan+i,nalloc);
 	      plotArrBin[j*dSet->head->nchan+i]=0;
+	      //	      printf("Before k\n");
 	      for (k=0;k<nbin;k++)
 		plotArrBin[j*dSet->head->nchan+i]+=plotArr[(nbin*j+k)*dSet->head->nchan+i];
 	      plotArrBin[j*dSet->head->nchan+i]/=nbin;
 	    }
 	}
 
-
       nDedispSamp = (int)(tdispWidth/dSet->head->tsamp);
-
+      //      printf("nDedispSamp = %d\n",nDedispSamp);
       sumSigX = (float *)malloc(sizeof(float)*nDedispSamp);
       sumSigY = (float *)malloc(sizeof(float)*nDedispSamp);
-      
+      //      printf("nbin = %d\n",nbin);
       for (j=0;j<nDedispSamp/nbin;j++)
 	{
 	  sumSigY[j]=0;
 	  sumSigX[j]=tdispCentre-tdispWidth/2.+dSet->head->tsamp*j*nbin;
 	}
       j0 = ((tdispCentre-tdispWidth/2.0-t1)/dSet->head->tsamp)/nbin;
-      
+      printf("Nchan = %d\n",dSet->head->nchan);
       for (i=0;i<dSet->head->nchan;i++)
 	{
 	  for (j=0;j<nDedispSamp/nbin;j++)
 	    {
 	      tdiff = 4.15e-3*dm*(pow(fref/1000.0,-2)-pow(dSet->head->chanFreq[i]/1000.0,-2));
 	      idiff = (int)(tdiff/dSet->head->tsamp/nbin);
-	  
-	  plotArr2[j*dSet->head->nchan+i] = plotArrBin[(j0+j-idiff)*dSet->head->nchan+i];
-	  sumSigY[j]+=plotArr2[j*dSet->head->nchan+i];
+	      //	      printf("Setting with i = %d idiff = %d j = %d j0 = %d\n",i,idiff,j,j0);
+	      //	      printf("Array positions are %d and %d (%d %d %d %d %d)\n",j*dSet->head->nchan+i,
+	      //		     (j0+j-idiff)*dSet->head->nchan+i,j0,j,idiff,dSet->head->nchan,i);
+	      plotArr2[j*dSet->head->nchan+i] = plotArrBin[(j0+j-idiff)*dSet->head->nchan+i];
+	      //	      printf("Have set plotArr2 - now sumSigY\n");
+	      sumSigY[j]+=plotArr2[j*dSet->head->nchan+i];
+	      //	      printf("Have set\n");
+	    }	  
 	}
-    }
-    
+      //      printf("POS 1\n");
       tr[0] = tdispCentre-tdispWidth/2.0;
       tr[1] = 0;
       tr[2] = dSet->head->tsamp*nbin;
@@ -242,12 +256,12 @@ int main(int argc,char *argv[])
 	  cpglab("Time from start of observation (s)","","");
 	}
       
-
+      printf("GEORGE\n");
       printf("Using %d %d\n",nchan,nTimeSamples);
       if (colourScheme==0)
 	{
 	  cpgctab(heat_l,heat_r,heat_g,heat_b,5,1.0,0.5);
-	  cpggray(plotArr2,nchan,nDedispSamp/nbin,1,nchan,1,nDedispSamp/nbin,0,3,tr);
+	  cpggray(plotArr2,nchan,nDedispSamp/nbin,1,nchan,1,nDedispSamp/nbin,minVal,maxVal,tr);
 	}
       else if (colourScheme==1)
 	{
@@ -329,7 +343,7 @@ int main(int argc,char *argv[])
 	      if (maxy < sumSigY[i]) maxy = sumSigY[i];
 	    }
 	}
-          
+      printf("GOT HERE AAA\n");     
       cpgsvp(0.1,0.9,0.75,0.9);
       cpgswin(tdispCentre-tdispWidth/2.,tdispCentre+tdispWidth/2.,miny,maxy+(maxy-miny)*0.1);
       cpgbox("ABCTS",0,0,"ABCTS",0,0);
@@ -353,12 +367,12 @@ int main(int argc,char *argv[])
 	      plotArrBin[j*dSet->head->nchan+i]/=nbin;
 		}
 	    }
-      tr[0] = t1;
-      tr[1] = 0;
-      tr[2] = dSet->head->tsamp*nbin;
-      tr[3] = dSet->head->chanFreq[0];  tr[4] = dSet->head->chanbw;  tr[5] = 0;
+	  tr[0] = t1;
+	  tr[1] = 0;
+	  tr[2] = dSet->head->tsamp*nbin;
+	  tr[3] = dSet->head->chanFreq[0];  tr[4] = dSet->head->chanbw;  tr[5] = 0;
 	  
-
+	  
 	  cpgimag(plotArrBin,nchan,nTimeSamples/2,1,nchan,1,nTimeSamples/2,minVal,maxVal,tr);
 	}
     }
@@ -496,7 +510,7 @@ int main(int argc,char *argv[])
       
       //    tdispCentre = 733.82;
       printf("frbTime = %g %g\n",tdiff,tdispCentre);
-      
+    
       for (j=0;j<nDedispSamp;j++)
 	{
 	  sumSigY[j]=0;

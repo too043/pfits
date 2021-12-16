@@ -51,7 +51,10 @@ int deallocateMemory(dSetStruct **dSet,int debugFlag)
 {
   if (debugFlag==1) printf("Entering deallocateMemory\n");
   if ((*dSet)->headerMemorySet==1)
-    free((*dSet)->head);
+    {
+      free((*dSet)->head);
+      if (debugFlag==1) printf("Free'd the header memory\n");
+    }
   free(*dSet);
   if (debugFlag==1) printf("Complete deallocateMemory\n");
 
@@ -105,20 +108,30 @@ void pfitsLoadHeader(dSetStruct *dSet,int debug)
   fits_read_key(dSet->fp,TINT,"NCHAN",&(dSet->head->nchan),NULL,&status);
   if (status) {printf("pos 1.3\n");  fits_report_error(stderr,status); exit(1);}
 
-  fits_read_key(dSet->fp,TFLOAT,"ZERO_OFF",&(dSet->head->zeroOff),NULL,&status);      
-
+  fits_read_key(dSet->fp,TSTRING,"ZERO_OFF",strTmp,NULL,&status);
+  if (strcmp(strTmp,"*")==0)
+    printf("Warning: ZERO_OFF is not set\n");
+  else
+    {  
+      fits_read_key(dSet->fp,TFLOAT,"ZERO_OFF",&(dSet->head->zeroOff),NULL,&status);      
+    }
+  if (status) {printf("Problem with reading ZERO_OFF.  Trying to continue\n");  fits_report_error(stderr,status); status=0;}
+  printf("The status from ZERO_OFF = %d\n",status);
   
+  printf("Trying to read nbits\n");
   fits_read_key(dSet->fp,TSTRING,"NBITS",strTmp,NULL,&status);
   if (strcmp(strTmp,"*")==0)
     printf("Warning: NBITS is not set\n");
   else
     {
+      printf("Reading nbits as an integer >%s<\n",strTmp);
       fits_read_key(dSet->fp,TINT,"NBITS",&(dSet->head->nbits),NULL,&status);
-      if (status) {printf("Error reading nbits ... trying to continue\n"); fits_report_error(stderr,status); status=0;}
+      if (status) {printf("Error reading nbits ... trying to continue\n"); status=0;}
     }
   fits_read_key(dSet->fp,TINT,"NPOL",&(dSet->head->npol),NULL,&status);
-  if (status) {printf("pos 1.5\n");  fits_report_error(stderr,status); exit(1);}
+  if (status) {printf("NPOL is not set. Cannot continue\n");  fits_report_error(stderr,status); exit(1);}
 
+  
   fits_read_key(dSet->fp,TSTRING,"NSBLK",strTmp,NULL,&status);
   if (strcmp(strTmp,"*")==0)
     printf("Warning: NBSBLK is not set\n");
@@ -130,7 +143,7 @@ void pfitsLoadHeader(dSetStruct *dSet,int debug)
 
   fits_read_key(dSet->fp,TSTRING,"TBIN",strTmp,NULL,&status);
   if (strcmp(strTmp,"*")==0)
-    printf("Warning: TBIN is not set\n");
+    {printf("Warning: TBIN is not set\n"); status=0;}
   else
     {
       fits_read_key(dSet->fp,TFLOAT,"TBIN",&(dSet->head->tsamp),NULL,&status);

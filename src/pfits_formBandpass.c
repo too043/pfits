@@ -42,6 +42,7 @@ int main(int argc,char *argv[])
   float *datWts;
   float *az;
   float *ze;
+  float *timeVal;
   float *fChan,fref;
   int initflag = 0;
   long nchan,nsub,nbin,npol;
@@ -68,7 +69,7 @@ int main(int argc,char *argv[])
   float sigma2=5;
   float sigma3=5;
 
-  char outFile[1024];
+  char outFile[1024]="NULL";
   int ignoreFirstSub=0;
   int ignoreLastSub=0;
   int useWts=0;
@@ -91,14 +92,16 @@ int main(int argc,char *argv[])
 	useWts=1;
       else if (strcmp(argv[i],"-out2pol")==0)
 	out2pol=1;
+      else if (strcmp(argv[i],"-o")==0)
+	strcpy(outFile,argv[++i]);
       else if (strcmp(argv[i],"-freq")==0)
 	{
 	  sscanf(argv[++i],"%f",&f1);
 	  sscanf(argv[++i],"%f",&f2);
 	}
     }
-  
-  sprintf(outFile,"%s.bandpass",dSet->fileName);
+  if (strcmp(outFile,"NULL")==0)
+    sprintf(outFile,"%s.bandpass",dSet->fileName);
          
   pfitsOpenFile(dSet,debug);
   pfitsLoadHeader(dSet,debug);
@@ -115,7 +118,7 @@ int main(int argc,char *argv[])
   printf("Number of bins = %d\n",nbin);
   printf("Number of sub-integrations = %d\n",nsub);
   printf("Number of polarisations = %d\n",npol);
-  
+
   spectrum = (float **)malloc(sizeof(float *)*nsub);
   specMean1 = (float *)malloc(sizeof(float)*nsub);
   specMean2 = (float *)malloc(sizeof(float)*nsub);
@@ -132,9 +135,14 @@ int main(int argc,char *argv[])
   datScl  = (float *)malloc(sizeof(float)*nchan*4); // *4 for npol
   datOffs = (float *)malloc(sizeof(float)*nchan*4);
   datWts  = (float *)malloc(sizeof(float)*nchan);
+
+  timeVal  = (float *)malloc(sizeof(float)*nsub);
   az  = (float *)malloc(sizeof(float)*nsub);
   ze  = (float *)malloc(sizeof(float)*nsub);
 
+  for (i=0;i<nsub;i++)
+    timeVal[i] = dSet->head->stt_smjd;
+   
   
   fits_movnam_hdu(dSet->fp,BINARY_TBL,"SUBINT",1,&status);
   fits_get_colnum(dSet->fp,CASEINSEN,"DATA",&colnum_data,&status);
@@ -144,6 +152,7 @@ int main(int argc,char *argv[])
   fits_get_colnum(dSet->fp,CASEINSEN,"TEL_AZ",&colnum_telAz,&status);
   fits_get_colnum(dSet->fp,CASEINSEN,"TEL_ZEN",&colnum_telZe,&status);
 
+  printf("Output file = %s\n",outFile);
   fout = fopen(outFile,"w");
   
   if (onlyScl==1) // Determine the bandpass just from the scale parameter
@@ -169,12 +178,14 @@ int main(int argc,char *argv[])
 	  mean4_1=0;
 	  mean4_2=0;
 	  n1=n2=n3=n4=0;
+
 	  for (i=0;i<nchan;i++)
 	    {
 	      freq = dSet->head->chanFreq[i];
 	      val = datScl[i]+datScl[i+nchan];
 	      val1 = datScl[i]+datOffs[i];
 	      val2 = datScl[i+nchan]+datOffs[i+nchan];
+	      //	      printf("Here with %g %g %d\n",datScl[i],datOffs[i],status);
 	      spectrum[ii][i] = val;
 	      //	      printf("val = %g\n",val);
 	      mean0+=val;
@@ -205,9 +216,9 @@ int main(int argc,char *argv[])
 	    }
 	  fprintf(fout,"\n");
 	  if (out2pol==0)
-	    printf("%s %.5d %g %g %g [AzZe] \n",dSet->fileName,ii,mean4/(double)n4,az[ii],ze[ii]);
+	    printf("%s %.5d %g %g %g [AzZe] %g\n",dSet->fileName,ii,mean4/(double)n4,az[ii],ze[ii],timeVal[ii]);
 	  else
-	    printf("%s %.5d %g %g %g %g [AzZe] \n",dSet->fileName,ii,mean4_1/(double)n4,mean4_2/(double)n4,az[ii],ze[ii]);
+	    printf("%s %.5d %g %g %g %g [AzZe] %g\n",dSet->fileName,ii,mean4_1/(double)n4,mean4_2/(double)n4,az[ii],ze[ii],timeVal[ii]);
 	}
 
     }
@@ -247,6 +258,7 @@ int main(int argc,char *argv[])
   //  free(dVals);
   //  free(sdevArr);
   free(az); free(ze);
+  free(timeVal);
   free(loadAll_pol1);
   free(loadAll_pol2);
   free(sval);

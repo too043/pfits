@@ -173,7 +173,7 @@ int main(int argc,char *argv[])
   float minx,maxx,miny,maxy;
   float *fChan,fref;
   
-  double dm=0;
+  double dm=-1;
   double tbin=0;
   
   float mx,my;
@@ -215,7 +215,7 @@ int main(int argc,char *argv[])
   int nz=0;
   float zapF0[1024],zapF1[1024];
   
-
+  int setNpol=-1;
   
   // Initialise everything
   initialise(&dSet,debug);
@@ -226,6 +226,10 @@ int main(int argc,char *argv[])
 	setFilename(argv[++i],dSet,debug);
       else if (strcmp(argv[i],"-tbin")==0)
 	sscanf(argv[++i],"%lf",&tbin);
+      else if (strcmp(argv[i],"-npol")==0)
+	sscanf(argv[++i],"%d",&setNpol);
+      else if (strcmp(argv[i],"-dm")==0)
+	sscanf(argv[++i],"%lf",&dm);
       else if (strcmp(argv[i],"-autoSave")==0)
 	autoSave=1;
       else if (strcmp(argv[i],"-nodm")==0)
@@ -271,8 +275,11 @@ int main(int argc,char *argv[])
   nbin  = dSet->head->nbin;
   nsub  = dSet->head->nsub;
   npol  = dSet->head->npol;
+  if (setNpol == 1)
+    npol=1;
 
-  get_dm_tbin(dSet,&dm,&tbin);
+  if (dm<0)
+    get_dm_tbin(dSet,&dm,&tbin);
   
   printf("Loaded header\n");
   printf("Number of channels = %d\n",nchan);
@@ -852,6 +859,7 @@ int main(int argc,char *argv[])
 	    zapF0[nz] = 3550.05; zapF1[nz++] = 3569.95;
 	    zapF0[nz] = 2487; zapF1[nz++] = 2496;
 
+
 	    // 920 MHz signal
 	    zapF0[nz] = 915; zapF1[nz++] = 928;
 
@@ -866,6 +874,21 @@ int main(int argc,char *argv[])
 	    // Persistent satellite signals
 	    zapF0[nz] = 1618; zapF1[nz++] = 1626.5; // Iridium
 
+	    // NEW SIGNALS
+	    zapF0[nz] = 2630; zapF1[nz++] = 2670;
+	    zapF0[nz] = 2150; zapF1[nz++] = 2156;
+	    zapF0[nz] = 3576; zapF1[nz++] = 3638;
+	    zapF0[nz] = 1825; zapF1[nz++] = 1845;
+	    zapF0[nz] = 756; zapF1[nz++] = 759;
+	    zapF0[nz] = 755; zapF1[nz++] = 757;
+	    zapF0[nz] = 1439; zapF1[nz++] = 1442;
+	    zapF0[nz] = 2157; zapF1[nz++] = 2166;
+	    zapF0[nz] = 910; zapF1[nz++] = 916;
+	    zapF0[nz] = 3195; zapF1[nz++] = 3207;
+	    zapF0[nz] = 867; zapF1[nz++] = 872;
+	    zapF0[nz] = 754; zapF1[nz++] = 756; 
+
+	    
 	    // +/- 5% of band edges
 	    for (i=0;i<26;i++)
 	      {

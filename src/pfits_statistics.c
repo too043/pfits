@@ -333,6 +333,26 @@ void doPlot(float *sum,float *min,float *max,int totCount,int *histogramTot,floa
 		cpgscf(2);
 		newplot=1;
 	      }
+	    else if (key=='s')
+	      {
+		char fname[1024];
+		FILE *fout;
+		strcpy(fname,"plotArray.dat");
+		if (!(fout = fopen(fname,"w")))
+		  {
+		    printf("Unable to open file >%s<\n",fname);
+		  }
+		else
+		  {
+		    if (plot==3)
+		      {
+			fprintf(fout,"nchan = %d nsub = %d\n",nchan,nsub);
+			for (i=0;i<nchan*nsub;i++)
+			  fprintf(fout,"%g\n",meanSub[i]);
+			fclose(fout);
+		      }
+		  }
+	      }
 	    else if (key=='z')
 	      {
 		float mx2,my2;

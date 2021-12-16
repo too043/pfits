@@ -563,7 +563,7 @@ void initialisePlot(plotStruct *plot)
   plot->t2 = 1;
   plot->rangeType = 1; // Single subint
   plot->colourPlot = 1;
-  plot->xPlotType = 1;
+  plot->xPlotType = 2;
   plot->polPlot = 1;
 }
 
@@ -726,13 +726,13 @@ void drawColourMap(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
 		   float *plotArr_p1,float *plotArr_p2,float *plotArr_p3)
 {
   float tr[6];
-  int nchan = dSet->head->nchan;
-  int nsblk = dSet->head->nsblk;
+  int   nchan    = dSet->head->nchan;
+  int   nsblk    = dSet->head->nsblk;
   float heat_l[] = {0.0, 0.2, 0.4, 0.6, 1.0};
   float heat_r[] = {0.0, 0.5, 1.0, 1.0, 1.0};
   float heat_g[] = {0.0, 0.0, 0.5, 1.0, 1.0};
   float heat_b[] = {0.0, 0.0, 0.0, 0.3, 1.0};
-  char title[128];
+  char  title[128];
 
   printf("Drawing a colour map\n");
   

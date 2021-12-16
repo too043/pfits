@@ -39,7 +39,7 @@ int main(int argc,char *argv[])
   int nTimeSamples;
   int nFreqSamples;
   float *result_p0,*result_p1;
-  long sub0=2; // Ignore the first few subints because of level setting issues
+  long sub0=0; // Ignore the first few subints because of level setting issues
   long sub1;
   double on0,on1;
   double baseline0,baseline1;
@@ -67,13 +67,13 @@ int main(int argc,char *argv[])
   result_p0 = (float *)malloc(sizeof(float)*dSet_cal->head->nsblk*dSet_cal->head->nsub);
   result_p1 = (float *)malloc(sizeof(float)*dSet_cal->head->nsblk*dSet_cal->head->nsub);
 
-        pfits_read1pol_zeroDM_float(result_p0,0,dSet_cal,sub0,sub1,2,&nSamples,&nTimeSamples,&nFreqSamples,debug);
-        pfits_read1pol_zeroDM_float(result_p1,1,dSet_cal,sub0,sub1,2,&nSamples,&nTimeSamples,&nFreqSamples,debug);
+  pfits_read1pol_zeroDM_float(result_p0,0,dSet_cal,sub0,sub1,2,&nSamples,&nTimeSamples,&nFreqSamples,debug);
+  pfits_read1pol_zeroDM_float(result_p1,1,dSet_cal,sub0,sub1,2,&nSamples,&nTimeSamples,&nFreqSamples,debug);
     //  for (i=0;i<nSamples;i++)
   //    printf("result: %ld %g\n",i,result_p0[i]);
 
   // Should return on0, on1, baseline0 and baseline1 from this function
-          determineOn_Off(dSet_cal,result_p0,result_p1,nSamples);
+  determineOn_Off(dSet_cal,result_p0,result_p1,nSamples);
 
   measureCalibrationParams(dSet_cal,sub0,sub1,baseline0,baseline1,on0,on1);
 

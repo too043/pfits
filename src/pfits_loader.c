@@ -87,7 +87,7 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
     samplesperbyte = 8/nbits;    
   else
     samplesperbyte = 1;
-  
+  printf("Got here\n");
   if (dSet->headerMemorySet==1 && dSet->fileOpen==1)
     {
       int colnum_datoffs,colnum_datscl;
@@ -146,17 +146,11 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
 		  // Issue here if NCHAN from the header isn't the same as the NCHAN passed through in "out"
 		  //		  printf("Converting to floats %d %d %d\n",scount,scount*nchan,samplesperbyte);
 		  pfits_bytesToFloats(samplesperbyte,nchan,cVals,out+scount*nchan);
-		  //		  printf("Done conversion\n");
-		  //		  if (subint==163) printf("c\n");
 		  if (offsScl==1)
 		    {
-		      for (j=0;j<nchan;j++)  // Is this really npol??
+		      for (j=0;j<nchan;j++) 
 			out[scount*nchan+j]=((out[scount*nchan+j]-dSet->head->zeroOff)*datScl[j])+datOffs[j];
-			//	out[scount*nchan+j]=(out[scount*nchan+j]-datOffs[j])*datScl[j]; //+datOffs[j]);
-			//			out[scount*nchan+j]=(out[scount*nchan+j]*datScl[j]+datOffs[j]);
-			//			out[scount*nchan+j]=log10(out[scount*nchan+j]*datScl[j]+datOffs[j]);
 		    }
-		  //		  if (subint==163) printf("d\n");
 		}
 	      else if (nbits == 16)
 		{
@@ -390,7 +384,8 @@ void pfits_bytesToFloats(int samplesperbyte,int n,unsigned char *cVals,float *ou
 	  break;
 
 	case 4:
-	  pointerFloat = twoBitsFloat;
+	  //	  pointerFloat = twoBitsFloat;
+	  pointerFloat = twoBitsFloat_unsigned;
 	  break;
 
 	case 8:
@@ -429,6 +424,18 @@ void fourBitsFloat(int eight_bit_number, float *results, int *index)
     results[(*index)++] = tempResults[i];
 }
 
+void twoBitsFloat_unsigned(int eight_bit_number, float *results, int *index)
+{
+  unsigned char uctmp = (unsigned char)eight_bit_number;
+  int i;
+
+  results[(*index)++] = ((uctmp >> 0x06) & 0x03);
+  results[(*index)++] = ((uctmp >> 0x04) & 0x03);
+  results[(*index)++] = ((uctmp >> 0x02) & 0x03);
+  results[(*index)++] = ((uctmp & 0x03));
+}
+
+// Note DSPSR is using this technique, but then doesn't scale by ZERO_OFFS
 void twoBitsFloat(int eight_bit_number, float *results, int *index)
 {
   // anding the least significant 2 bits with 0000 0011 will give the (signed 2-bit number
@@ -440,6 +447,8 @@ void twoBitsFloat(int eight_bit_number, float *results, int *index)
   // -1 -> -0.5
   // -2 -> -2.0
 
+
+  // NOTE: ACTUAL -2.5 below !!
   float tempResults[4];
   int i;
 

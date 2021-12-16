@@ -23,11 +23,11 @@ void help()
 
 int main(int argc,char *argv[])
 {
-  float tsub = 30; // Should read from file
+  float tsub = 10; // 30; // Should read from file
   
   // Define a small clean band (MHz) for extracting cal on/off bins
-  float cleanBand_start = 2650;
-  float cleanBand_end   = 2700;
+  float cleanBand_start = 3050;
+  float cleanBand_end   = 3100;
 
   // Cal on/off ratio in a given channel in a given subband must
   // be greater than this value
@@ -94,6 +94,8 @@ int main(int argc,char *argv[])
   FILE *fin;
   float tsys[4096];
   float tcal[4096];
+  char ssys_scal[4096];
+  int haveSsysScal=0;
   int   nTsysTcal=0;
   float temp;
   float tcal_p1,tcal_p2,tsys_p1,tsys_p2;
@@ -109,28 +111,60 @@ int main(int argc,char *argv[])
     {
       if (strcmp(argv[i],"-cal")==0)
 	{setFilename(argv[++i],dSetCal,debug); haveCal=1;}
-      if (strcmp(argv[i],"-psr")==0)
+      else if (strcmp(argv[i],"-psr")==0)
 	{setFilename(argv[++i],dSetPsr,debug); havePsr=1;}
+      else if (strcmp(argv[i],"-ssys_scal")==0)
+	{
+	  strcpy(ssys_scal,argv[++i]);
+	  haveSsysScal=1;	  
+	}
       else if (strcmp(argv[i],"-tbin")==0)
 	sscanf(argv[++i],"%lf",&tbin);
+      else if (strcmp(argv[i],"-tsub")==0)
+	sscanf(argv[++i],"%f",&tsub);
     }
        
 
-  fin = fopen("scal_ssys.dat","r");
-  nTsysTcal=0;
-  while (!feof(fin))
+  if (haveSsysScal==0)
     {
-      if (fscanf(fin,"%f %f %f %f %f %f %f %f %f %f",&temp,&tcal_p1,&temp,&tcal_p2,&temp,
-		 &temp,&tsys_p1,&temp,&tsys_p2,&temp)==10)
+      fin = fopen("scal_ssys.dat","r");
+      nTsysTcal=0;
+      while (!feof(fin))
 	{
-	  tcal[nTsysTcal] = (tcal_p1+tcal_p2)/2.;
-	  tsys[nTsysTcal] = (tsys_p1+tsys_p2)/2.;
-	  nTsysTcal++;
+	  if (fscanf(fin,"%f %f %f %f %f %f %f %f %f %f",&temp,&tcal_p1,&temp,&tcal_p2,&temp,
+		     &temp,&tsys_p1,&temp,&tsys_p2,&temp)==10)
+	    {
+	      tcal[nTsysTcal] = (tcal_p1+tcal_p2)/2.;
+	      tsys[nTsysTcal] = (tsys_p1+tsys_p2)/2.;
+	      nTsysTcal++;
+	    }
+	  
 	}
-    
+      fclose(fin);
     }
-  fclose(fin);
-  
+  else
+    {
+      int ichan;
+      if (!(fin = fopen(ssys_scal,"r")))
+	{
+	  printf("ERROR: unable to open file: %s\n",ssys_scal);
+	  exit(1);
+	}
+      nTsysTcal = 3328; // FIX ME - HARD CODE TO 1 MHZ CHANNELS
+      while (!feof(fin))
+	{
+	  // Noting assuming channel number in column one
+	  // This is taking the output of pacv -F ... (for ordering)
+	  if (fscanf(fin,"%d %f %f %f %f %f %f %f %f",&ichan,&tsys_p1,&temp,&tcal_p1,&temp,
+		     &tsys_p2,&temp,&tcal_p2,&temp)==9)
+	    {
+	      tcal[ichan] = (tcal_p1+tcal_p2)/2.;
+	      tsys[ichan] = (tsys_p1+tsys_p2)/2.;
+	    }
+	}
+      fclose(fin);
+    }
+   
   pfitsOpenFile(dSetCal,debug);
   pfitsLoadHeader(dSetCal,debug);
   if (havePsr==1)
@@ -280,9 +314,12 @@ int main(int argc,char *argv[])
 	  cleanCalSum[jj+1] < (minClean+maxClean)*0.5)
 	bin_calOn2Off = jj;
     }
+  printf("Cal ON/OFF bins = off2on: %d and on2off: %d\n ",bin_calOff2On,bin_calOn2Off);
   // Sort out if each bin is on (=1)/off (=0) or unknown (=-1)
+
   for (jj=0;jj<nbin;jj++)
     {
+      //      off2on: 606 and on2off: 98
       if (bin_calOff2On < bin_calOn2Off)
 	{
 	  if (jj > bin_calOff2On+(bin_calOn2Off-bin_calOff2On)*0.1 && jj < bin_calOn2Off - (bin_calOn2Off-bin_calOff2On)*0.1)
@@ -291,6 +328,17 @@ int main(int argc,char *argv[])
 	    calOnOrOff[jj] = 0;
 	  else if (jj > bin_calOn2Off+(bin_calOn2Off-bin_calOff2On)*0.1)
 	    calOnOrOff[jj] = 0;
+	  else
+	    calOnOrOff[jj] = -1;
+	}
+      else
+	{
+	  if (jj > bin_calOn2Off+(bin_calOff2On-bin_calOn2Off)*0.1 && jj < bin_calOff2On - (bin_calOff2On-bin_calOn2Off)*0.1)
+	    calOnOrOff[jj] = 0;
+	  else if (jj < bin_calOn2Off-(bin_calOff2On-bin_calOn2Off)*0.1)
+	    calOnOrOff[jj] = 1;
+	  else if (jj > bin_calOff2On+(bin_calOff2On-bin_calOn2Off)*0.1)
+	    calOnOrOff[jj] = 1;
 	  else
 	    calOnOrOff[jj] = -1;
 	}
@@ -344,9 +392,9 @@ int main(int argc,char *argv[])
 	    calOffMean[ii*nchan+kk] = sum_off/(double)nOff;
 	    calOnSdev[ii*nchan+kk] = sqrt(1./(double)nOn*sum2_on - pow(sum_on/(double)nOn,2));
 	    calOffSdev[ii*nchan+kk] = sqrt(1./(double)nOff*sum2_off - pow(sum_off/(double)nOff,2));
-	    printf("%d %d %g %g %g %g calOnOff_mean_sdev\n",ii,kk,calOnMean[ii*nchan+kk],calOnSdev[ii*nchan+kk],calOffMean[ii*nchan+kk],calOffSdev[ii*nchan+kk]);
+	    printf("%d %d %g %g %g %g %g calOnOff_mean_sdev\n",ii,kk,fChan[kk],calOnMean[ii*nchan+kk],calOnSdev[ii*nchan+kk],calOffMean[ii*nchan+kk],calOffSdev[ii*nchan+kk]);
 	}
-    }
+  }
 
     for (jj=0;jj<nbin;jj++)
     {
@@ -373,7 +421,7 @@ int main(int argc,char *argv[])
 	    {
 	      datWtsCal[ii*nchan+kk]=0;
 	    }
-	  if (ii==2) printf("%d %d %g %g %g outResults\n",ii,kk,datWtsCal[ii*nchan+kk],val,tcal[kk]/tsys[kk]);
+	  if (ii==2) printf("%d %d freq = %g datWtsCal = %g val = %g tcal/tsys = %g calOffSdev = %g calOnMean = %g calOffMean = %g outResults\n",ii,kk,fChan[kk],datWtsCal[ii*nchan+kk],val,tcal[kk]/tsys[kk],calOffSdev[ii*nchan+kk],calOnMean[ii*nchan+kk],calOffMean[ii*nchan+kk]);
 	}
     }
   
@@ -479,6 +527,7 @@ int main(int argc,char *argv[])
 	  
 	}
       printf("Zapping channels in pulsar file\n");
+      printf("nChanPsr = %d\n",nChanPsr);
       for (ii=0;ii<nChanPsr;ii++)
 	{
 	  allZero=1;
@@ -511,22 +560,29 @@ int main(int argc,char *argv[])
 	      
 	    }
 	}
+
       {
 	FILE *fout;
-	fout = fopen("sdev.dat","w");
-	
-	for (ii=0;ii<dSetPsr->head->nchan;ii++)
+	if (!(fout = fopen("sdev.dat","w")))
 	  {
-	    for (kk=0;kk<dSetPsr->head->nsub;kk++)
-	      {
-		if (datWtsPsr[kk*dSetPsr->head->nchan+ii] == 0)
-		  fprintf(fout,"%d %d %g zapped\n",ii,kk,0.0);
-		else
-		  fprintf(fout,"%d %d %g\n",ii,kk,sdevArr[ii*nSubPsr+kk]);
-	      }
-	    fprintf(fout,"\n");
+	    printf("WARNING: unable to write to sdev.dat\n");
 	  }
-	fclose(fout);
+	else
+	  {
+	    
+	    for (ii=0;ii<dSetPsr->head->nchan;ii++)
+	      {
+		for (kk=0;kk<dSetPsr->head->nsub;kk++)
+		  {
+		    if (datWtsPsr[kk*dSetPsr->head->nchan+ii] == 0)
+		      fprintf(fout,"%d %d %g zapped\n",ii,kk,0.0);
+		    else
+		      fprintf(fout,"%d %d %g\n",ii,kk,sdevArr[ii*nSubPsr+kk]);
+		  }
+		fprintf(fout,"\n");
+	      }
+	    fclose(fout);
+	  }
       }
       
       

@@ -14,7 +14,7 @@
  * along with pfits.  If not, see <http://www.gnu.org/licenses/>. 
 */
 
-//gcc -lm -o pfits_getZeroDM pfits_getZeroDM.c pfits_setup.c pfits_loader.c -I/Users/hob044/hob044/software/cfitsio/include/ -L/Users/hob044/hob044/software/cfitsio/lib -lcfitsio 
+//gcc -lm -o pfits_getZeroDM pfits_getZeroDM.c pfits_setup.c pfits_loader.c -I/Users/hob044/hob044/software/cfitsio/include/ -L/Users/hob044/hob044/software/cfitsio/lib -lcfitsio -lfftw3
 
 #include <stdio.h>
 #include <math.h>
@@ -23,6 +23,7 @@
 #include "pfits.h"
 #include <cpgplot.h>
 #include "fitsio.h"
+#include "fftw3.h"
 
 int main(int argc,char *argv[])
 {
@@ -32,7 +33,9 @@ int main(int argc,char *argv[])
   int i,j,k;
   float *data;
 
-    int subint;
+  char outFile[128]="zeroDM.dat";
+  FILE *fout;
+  int subint;
   long nSamples;
   int nTime,nFreq;
   float sum1,sum2;
@@ -45,16 +48,25 @@ int main(int argc,char *argv[])
   int setFreq=0;
   int sclOff=0;
   int tAv=1;
-  int n;
+  int fft=0;
+  long n,nc;
+
   
-  i0 = 53;
-  i1 = 130;
+  fftw_complex *output;
+  double mean=0;
+  double *in_vals;
+  fftw_plan transform_plan;
+  
+  i0 = -1;
+  i1 = -1;
+
+  sub0 = -1;
+  sub1 = -1;
+
   
   for (i=0;i<255;i++)
     histogramTot[i]=0;
  
-  sub0 = 0;
-  sub1 = 1;
   
   // Initialise everything
   initialise(&dSet,debug);
@@ -64,6 +76,8 @@ int main(int argc,char *argv[])
     {
       if (strcmp(argv[i],"-f")==0)
 	setFilename(argv[++i],dSet,debug);
+      else if (strcmp(argv[i],"-o")==0)
+	strcpy(outFile,argv[++i]);
       else if (strcasecmp(argv[i],"-tav")==0)
 	sscanf(argv[++i],"%d",&tAv);
       else if (strcmp(argv[i],"-s1")==0)
@@ -72,12 +86,14 @@ int main(int argc,char *argv[])
 	sscanf(argv[++i],"%d",&sub1);
       else if (strcmp(argv[i],"-pol")==0)
 	sscanf(argv[++i],"%d",&pol);
-      else if (strcmp(argv[i],"-c0")==0)
-	sscanf(argv[++i],"%d",&i0);
       else if (strcmp(argv[i],"-c1")==0)
+	sscanf(argv[++i],"%d",&i0);
+      else if (strcmp(argv[i],"-c2")==0)
 	sscanf(argv[++i],"%d",&i1);
       else if (strcmp(argv[i],"-scale")==0)
 	sclOff=1;
+      else if (strcmp(argv[i],"-fft")==0)
+	fft=1;
       else if (strcmp(argv[i],"-f0")==0)
 	{sscanf(argv[++i],"%f",&f0); setFreq=1;}
       else if (strcmp(argv[i],"-f1")==0)
@@ -87,6 +103,11 @@ int main(int argc,char *argv[])
   pfitsOpenFile(dSet,debug);
   pfitsLoadHeader(dSet,debug);
 
+  if (sub0 == -1)
+    sub0 = 0;
+  if (sub1 == -1)
+    sub1 = dSet->head->nsub;
+  
   if (setFreq==1)
     {
       i0=i1=-1;
@@ -102,11 +123,26 @@ int main(int argc,char *argv[])
       if (i1==-1) i1=dSet->head->nchan;
       printf("Have %d %d\n",i0,i1);
     }
+  else
+    {
+      if (i0==-1) i0=0;
+      if (i1==-1) i1=dSet->head->nchan;
+    }
   data = (float *)malloc(sizeof(float)*dSet->head->nsblk*dSet->head->nchan);
+  
   totCount=0;
 
+  fout = fopen(outFile,"w");
+
+  if (fft==1)
+    {
+      in_vals = (double *)malloc(sizeof(double)*dSet->head->nsblk*dSet->head->nsub);
+    }
+
+  nc=0;
   for (subint=sub0;subint<sub1;subint++)
     {
+      printf("Subint %d/%d\n",subint,sub1);
       pfits_read1pol_float(data,pol,dSet,subint,subint,1,&nSamples,&nTime,&nFreq,debug,sclOff);
       for (j=0;j<nTime;j+=tAv)
 	{
@@ -128,10 +164,42 @@ int main(int argc,char *argv[])
 		  
 		}	      
 	    }
-	  printf("result: %d %g %g %d\n",totCount,totCount*dSet->head->tsamp,sum1/(double)n,dSet->head->nchan);
+	  if (fft==1)
+	    {
+	      mean+=sum1/(double)n;
+	      in_vals[nc]=sum1/(double)n;
+	    }
+	  fprintf(fout,"%d %g %g\n",totCount,totCount*dSet->head->tsamp,sum1/(double)n);
+	  nc++;
 	}
     }
+  fclose(fout);
 
+  if (fft==1)
+    {
+      double freq;
+
+      mean/=(double)nc;
+      output = (fftw_complex *)fftw_malloc(sizeof(fftw_complex)*nc);
+      printf("Allocation = %ld %d %d\n",(long)(dSet->head->nsblk*dSet->head->nsub),dSet->head->nsblk,dSet->head->nsub);
+      printf("FFT n = %d\n",nc);
+      for (i=0;i<nc;i++)
+	in_vals[i]-=mean;
+      printf("Removed mean\n");
+      transform_plan = fftw_plan_dft_r2c_1d(nc,in_vals,output,FFTW_ESTIMATE);
+      printf("Running fft\n");
+      fftw_execute(transform_plan);
+      printf("Complete running fft\n");
+      fout = fopen("fft.dat","w");
+      for (i=0;i<nc/2;i++)
+	{
+	  freq = (double)i/((sub1-sub0)*dSet->head->nsblk*dSet->head->tsamp);
+	  fprintf(fout,"%g %g\n",freq,pow(output[i][0],2)+pow(output[i][1],2));
+	}
+      fclose(fout);
+      free(in_vals);
+      free(output);
+    }
   
   free(data);
   // De-allocate the memory

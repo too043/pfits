@@ -93,6 +93,7 @@ void pfits_bytesToFloats(int samplesperbyte,int n,unsigned char *cVals,float *ou
 void eightBitsFloat(int eight_bit_number, float *results, int *index);
 void fourBitsFloat(int eight_bit_number, float *results, int *index);
 void twoBitsFloat(int eight_bit_number, float *results, int *index);
+void twoBitsFloat_unsigned(int eight_bit_number, float *results, int *index);
 void oneBitFloat(int eight_bit_number, float *results, int *index);
 void pfits_read1pol_zeroDM_float(float *out,int polNum,dSetStruct *dSet,float t1,float t2,int rangeType,long *nSamples,int *nTimeSamples,int *nFreqSamples,int debugFlag);
 

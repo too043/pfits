@@ -50,7 +50,7 @@ int main(int argc,char *argv[])
   FILE *fout;
   int maxNsub = -1;
   int nbeam=1;
-  float delta=0.01;
+  float delta=0.02;
   int plotTimeSamples = 128;
   int curPos=0;
   int subintCount=0;
@@ -61,8 +61,9 @@ int main(int argc,char *argv[])
   float **ringBuffer;
   float **plotBuffer;
   int  shiftSample=1;
-  
+  float minX=-1,maxX=-1;
   char temp[1024];
+  float x0,x1;
   
   printf("Starting\n");
   
@@ -79,6 +80,14 @@ int main(int argc,char *argv[])
     {
       if (strcmp(argv[i],"-f")==0)
 	setFilename(argv[++i],dSet[beamNum++],debug);
+      else if (strcmp(argv[i],"-pt")==0)
+	sscanf(argv[++i],"%d",&plotTimeSamples);
+      else if (strcmp(argv[i],"-minx")==0)
+	sscanf(argv[++i],"%f",&minX);
+      else if (strcmp(argv[i],"-maxx")==0)
+	sscanf(argv[++i],"%f",&maxX);
+      else if (strcmp(argv[i],"-s")==0)
+	sscanf(argv[++i],"%d",&subintCount);
       else if (strcmp(argv[i],"-csv")==0)
 	csv=1;
       else if (strcmp(argv[i],"-maxNsub")==0)
@@ -135,127 +144,162 @@ int main(int argc,char *argv[])
 	    memcpy(plotBuffer[j]+(plotTimeSamples*nchan-ringPosI*nchan),ringBuffer[j],(ringPosI*nchan)*sizeof(float));
 	}
       if (screen==1)
-	cpgbeg(0,"1/xs",1,1);
+	//	cpgbeg(0,"1/xs",1,1);
+	cpgbeg(0,"result.ps/cps",1,1);
       else
 	{
-	  sprintf(fname,"movieImg/image_%06d.png/png",imgNum);
+	  //	  sprintf(fname,"movieImg/image_%06d.png/png",imgNum);
+	  sprintf(fname,"image_%06d.png/png",imgNum);
 	  cpgbeg(0,fname,1,1);	  
 	}
       cpgsvp(0,0.15,0.9,1.0);
       cpgswin(0,1,0,1);
-      sprintf(str,"%.3f sec",curPos*dSet[0]->head->tsamp);
-      cpgtext(0.1,0.1,str);
+      cpgscf(2);
+      cpgsch(0.7);
+      cpgslw(2);
+      //      sprintf(str,"%.3f sec",curPos*dSet[0]->head->tsamp);
+      //      cpgtext(0.1,0.1,str);
 
+      if (minX < 0 && maxX < 0)
+	{
+	  x0 = 0;
+	  x1 = plotTimeSamples;
+	}
+      else
+	{
+	  x0 = minX;
+	  x1 = maxX;
+	}
       if (nbeam==1)
 	{
-	  cpgsvp(0.1,0.9,0.1,0.8); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTSN",0,0,"ABCTSN",0,0);  // Beam 1
+	  cpgsvp(0.1,0.9,0.1,0.8); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTSN",0,0,"ABCTSN",0,0);  // Beam 1
 	  cpggray(plotBuffer[0],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
 	}
       else
 	{
-	  cpgsvp(0.4+delta,0.6-delta,0.4+delta,0.6-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 1
+	  cpgsvp(0.4+delta,0.6-delta,0.4+delta,0.6-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 1
 	  cpggray(plotBuffer[0],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 1");
 	}
       if (nbeam >= 2)
 	{
-	  cpgsvp(0.2+delta,0.4-delta,0.25+delta,0.45-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 2
+	  cpgsvp(0.2+delta,0.4-delta,0.25+delta,0.45-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 2
 	  cpggray(plotBuffer[1],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 2");
+
 	}
       if (nbeam >= 3)
 	{
-	  cpgsvp(0.4+delta,0.6-delta,0.15+delta,0.35-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 3
+	  cpgsvp(0.4+delta,0.6-delta,0.15+delta,0.35-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 3
 	  cpggray(plotBuffer[2],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 3");
 	}
 
       
       if (nbeam >= 4)
 	{      
-	  cpgsvp(0.6+delta,0.8-delta,0.25+delta,0.45-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 4
+	  cpgsvp(0.6+delta,0.8-delta,0.25+delta,0.45-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 4
 	  cpggray(plotBuffer[3],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 4");
 	}
 
       if (nbeam >= 5)
 	{
-	  cpgsvp(0.6+delta,0.8-delta,0.55+delta,0.75-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 5
+	  cpgsvp(0.6+delta,0.8-delta,0.55+delta,0.75-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 5
 	  cpggray(plotBuffer[4],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 5");
 	}
 
       if (nbeam >= 6)
 	{
-	  cpgsvp(0.4+delta,0.6-delta,0.65+delta,0.85-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 6
+	  cpgsvp(0.4+delta,0.6-delta,0.65+delta,0.85-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 6
 	  cpggray(plotBuffer[5],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 6");
 	}
 
       if (nbeam >= 7)
 	{
-	  cpgsvp(0.2+delta,0.4-delta,0.55+delta,0.75-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 7
+	  cpgsvp(0.2+delta,0.4-delta,0.55+delta,0.75-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 7
 	  cpggray(plotBuffer[6],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 7");
 	}
 
       if (nbeam >= 8)
 	{
-	  cpgsvp(0.0+delta,0.2-delta,0.4+delta,0.6-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 8
+	  cpgsvp(0.0+delta,0.2-delta,0.4+delta,0.6-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 8
 	  cpggray(plotBuffer[7],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 8");
 	}
 
       if (nbeam >= 9)
 	{
-	  cpgsvp(0.2+delta,0.4-delta,0.0+delta,0.2-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 9
+	  cpgsvp(0.2+delta,0.4-delta,0.0+delta,0.2-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 9
 	  cpggray(plotBuffer[8],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 9");
 	}
 
       if (nbeam >= 10)
 	{
-	  cpgsvp(0.6+delta,0.8-delta,0.0+delta,0.2-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 10
+	  cpgsvp(0.6+delta,0.8-delta,0.0+delta,0.2-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 10
 	  cpggray(plotBuffer[9],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 10");
 	}
 
       if (nbeam >= 11)
 	{
-	  cpgsvp(0.8+delta,1.0-delta,0.4+delta,0.6-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 11
+	  cpgsvp(0.8+delta,1.0-delta,0.4+delta,0.6-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 11
 	  cpggray(plotBuffer[10],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 11");
 	}
 
       if (nbeam >= 12)
 	{
-	  cpgsvp(0.6+delta,0.8-delta,0.8+delta,1.0-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 12
+	  cpgsvp(0.6+delta,0.8-delta,0.8+delta,1.0-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 12
 	  cpggray(plotBuffer[11],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 12");
 	}
 
       if (nbeam >= 13)
 	{
-	  cpgsvp(0.2+delta,0.4-delta,0.8+delta,1.0-delta); cpgswin(0,plotTimeSamples,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 13
+	  cpgsvp(0.2+delta,0.4-delta,0.8+delta,1.0-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 13
 	  cpggray(plotBuffer[12],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
+	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 13");
 	}
+      printf("Closing up\n");
       //      scanf("%s",&temp);
       cpgend();
-
-      for (k=0;k<shiftSample;k++)
+      if (screen==1)
+	break;
+      if (screen==0)
 	{
-	  curPos+=1;
-	  ringPosI++;
-	  if (ringPosI == plotTimeSamples) ringPosI = 0;
-	  if (curPos==nsblk)
+	  for (k=0;k<shiftSample;k++)
 	    {
-	      subintCount++;
-	      curPos=0;
-	      for (i=0;i<nbeam;i++)
-		pfits_read1pol_float(plotArr[i],0,dSet[0],subintCount,subintCount,1,&nSamples,&nTimeSamples,&nFreqSamples,debug,0);
-	    }
-	  
-	  for (j=0;j<nbeam;j++)
-	    {
-	      for (i=0;i<nchan;i++)
+	      curPos+=1;
+	      ringPosI++;
+	      if (ringPosI == plotTimeSamples) ringPosI = 0;
+	      if (curPos==nsblk)
 		{
-		  if ((ringPosI) == plotTimeSamples)
-		    ringBuffer[j][(ringPosI)*nchan+i]=plotArr[j][(curPos)*nchan+i];
+		  subintCount++;
+		  curPos=0;
+		  for (i=0;i<nbeam;i++)
+		    pfits_read1pol_float(plotArr[i],0,dSet[0],subintCount,subintCount,1,&nSamples,&nTimeSamples,&nFreqSamples,debug,0);
+		}
+	      
+	      for (j=0;j<nbeam;j++)
+		{
+		  for (i=0;i<nchan;i++)
+		    {
+		      if ((ringPosI) == plotTimeSamples)
+			ringBuffer[j][(ringPosI)*nchan+i]=plotArr[j][(curPos)*nchan+i];
+		    }
 		}
 	    }
+	  printf("Shifting\n");
+	  imgNum+=1;
 	}
-      imgNum+=1;
       //      exit(1);
     }
-
+  printf("In here\n");
  
 
   /*  if (maxNsub < 0) maxNsub = nsub;
@@ -313,13 +357,11 @@ int main(int argc,char *argv[])
     }
   */
   for (i=0;i<nbeam;i++)
-    {
-      free(plotArr[i]);
-      free(ringBuffer);
-      free(plotBuffer);
-    }
-  free(plotArr);
+    free(plotArr[i]);
+  
   free(ringBuffer);
   free(plotBuffer);
+
+  
 }
 

@@ -7,19 +7,23 @@
 #include "pfits.h"
 #include <cpgplot.h>
 
-void drawColourMap(dSetStruct *dSet,int pol);
+
+void drawColourMap(dSetStruct *dSet,int pol,int outTxt);
 
 int main(int argc,char *argv[])
 {
   dSetStruct *dSet;
   char fname[1024];
   int debug=0;
+  int outTxt=0;
   int i;
 
   for (i=0;i<argc;i++)
     {
       if (strcmp(argv[i],"-f")==0)
 	strcpy(fname,argv[++i]);
+      else if (strcmp(argv[i],"-txt")==0) // THIS DOESN'T DO ANYTHING YET
+	outTxt=1;
     }
   dSet = (dSetStruct *)malloc(sizeof(dSetStruct));
   initialise(&dSet,debug);
@@ -28,9 +32,9 @@ int main(int argc,char *argv[])
   pfitsOpenFile(dSet,debug);
   printf("Loading header\n");
   pfitsLoadHeader(dSet,debug);
-  drawColourMap(dSet,0);
-  
-  cpgend();
+  drawColourMap(dSet,0,outTxt);
+  if (outTxt==0)
+    cpgend();
   
 
   //  pfitsCloseFile(dSet,debug);
@@ -41,7 +45,7 @@ int main(int argc,char *argv[])
 
 
 
-void drawColourMap(dSetStruct *dSet,int pol)
+void drawColourMap(dSetStruct *dSet,int pol,int outTxt)
 {
   float tr[6];
   int nchan = dSet->head->nchan;

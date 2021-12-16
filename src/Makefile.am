@@ -27,10 +27,7 @@ LDADD = libpfits.la @CFITSIO_LIBS@ @FFTW_LIBS@
 if HAVE_PGPLOT
 
   bin_PROGRAMS += pfits_plot \
-    pfits_plotfold \
-    pfits_plotsearch \
-    pfits_addFRB_1bit \
-    pfits_addFRB \
+    pfits_plot \
     pfits_zapProfile \
     pfits_zapUWL \
     pfits_zapUWL_auto \
@@ -43,11 +40,9 @@ if HAVE_PGPLOT
     pfits_read_1bitExtraction \
     pfits_cal \
     pfits_change \
-    pfits_convertText \
     pfits_dedisperse \
     pfits_describe \
     pfits_extract1bit \
-    pfits_extractImage \
     pfits_fftSearch \
     pfits_fluxcal \
     pfits_foldStatistics \
@@ -62,13 +57,10 @@ if HAVE_PGPLOT
     pfits_merge \
     pfits_output \
     pfits_output1 \
-    pfits_outValues
+    pfits_outValues \
+    pfits_checkRandom
 
   pfits_plot_SOURCES = pfits_plot.c pfits_setup.c pfits_loader.c
-  pfits_plotfold_SOURCES = pfits_plot.c pfits_setup.c pfits_loader.c
-  pfits_plotsearch_SOURCES = pfits_plot.c pfits_setup.c pfits_loader.c
-  pfits_addFRB_1bit_SOURCES = pfits_addFRB_1bit.c pfits_setup.c pfits_loader.c T2toolkit.c
-  pfits_addFRB_SOURCES = pfits_addFRB.c pfits_setup.c pfits_loader.c T2toolkit.c
   pfits_zapProfile_SOURCES = pfits_zapProfile.c pfits_setup.c 
   pfits_zapUWL_SOURCES = pfits_zapUWL.c pfits_setup.c 
   pfits_zapUWL_auto_SOURCES = pfits_zapUWL_auto.c pfits_setup.c 
@@ -87,7 +79,6 @@ if HAVE_PGPLOT
   pfits_makeTimeMovie_SOURCES = pfits_makeTimeMovie.c pfits_setup.c pfits_loader.c
   pfits_foldStatistics_SOURCES = pfits_foldStatistics.c pfits_setup.c
   pfits_formBandpass_SOURCES = pfits_formBandpass.c pfits_setup.c
-  pfits_convertText_SOURCES = pfits_convertText.c pfits_setup.c pfits_loader.c
   pfits_dedisperse_SOURCES = pfits_dedisperse.c pfits_setup.c pfits_loader.c
   pfits_describe_SOURCES = pfits_describe.c pfits_setup.c pfits_loader.c
   pfits_extract1bit_SOURCES = pfits_extract1bit.c pfits_setup.c pfits_loader.c
@@ -100,7 +91,7 @@ if HAVE_PGPLOT
   pfits_output_SOURCES = pfits_output.c pfits_setup.c pfits_loader.c
   pfits_output1_SOURCES = pfits_output1.c pfits_setup.c pfits_loader.c
   pfits_outValues_SOURCES = pfits_outValues.c pfits_setup.c pfits_loader.c
-  pfits_extractImage_SOURCES = pfits_extractImage.c pfits_setup.c pfits_loader.c T2toolkit.c
+  pfits_checkRandom_SOURCES = pfits_checkRandom.c pfits_setup.c pfits_loader.c
   
   AM_CFLAGS = @PGPLOT_CFLAGS@
   LDADD += @PGPLOT_LIBS@
