@@ -5,14 +5,18 @@
 // Routine to copy a PSRFITS file, but use an up-to-date template
 //
 // gcc -lm -o pfitsUtil_copyToNew pfitsUtil_copyToNew.c -lcfitsio
-// gcc -lm -o pfitsUtil_copyToNew_tycho pfitsUtil_copyToNew.c -L/pulsar/psr/software/20170525/src/util/anaconda2/lib cfitsio/libcfitsio.a -lcurl
-
+//
+// 15-08-2018 Compiled with cfitsio 3450
+//
+// gcc -lm -o pfitsUtil_copyToNew_v2_LT pfitsUtil_copyToNew_v2_LT.c -I/home/archivist/processing/software/share/cfitsio_3450/include -L/home/archivist/processing/software/share/cfitsio_3450/lib -lcfitsio
+//
 
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include <fitsio.h>
+//#include "/home/archivist/processing/software/share/cfitsio_3450/include/fitsio.h"
 
 //void setHeaderInformation(fitsfile *outfptr,char *fname,double *stt_offs_ref);
 //void copyData(fitsfile *outfptr,char *fname,double stt_offs_ref);
@@ -358,29 +362,34 @@ void processExistingHDU(fitsfile *outfptr,fitsfile *infptr,int hduNum)
       // Get the number of rows from the input data file
       fits_get_num_rows(infptr,&nRows,&status); printf("nRows %d\n",(int)nRows);
       fits_get_num_cols(infptr,&nCols,&status); printf("nCols %d\n",(int)nCols);
+      printf("Inserting %d rows\n",nRows);
       fits_insert_rows(outfptr,0,nRows,&status);
       if (status) {printf("inserting rows\n"); fits_report_error(stderr, status); exit(1);}
       printf("Got here\n");
       for (i=0;i<nCols;i++)
 	{
 	  fits_get_colname(infptr,0,"*",colName,&colNumIn,&sstat);
-	  if (strcmp(colName,"REF_FREQ")==0)
+	  if (status) {printf("error getting colName\n"); fits_report_error(stderr, status); exit(1);}
+	  printf("Processing column %s\n",colName);
+	  if (strcmp(colName,"REF_FREQ")==0 || strcmp(colName,"PERIOD")==0)
 	    {
-	      printf("WARNING: IGNORING REF_FREQ\n");
+	      printf("WARNING: IGNORING REF_FREQ, PERIOD\n");
 	    }
 	  else
 	    {
 	      fits_get_colnum(outfptr,0,colName,&colNumOut,&status);
-	      if (status) {printf("error getting colName\n"); fits_report_error(stderr, status); exit(1);}
+	      printf("Numnber for the column = %d\n",colNumOut);
+	      if (status) {printf("error getting colNum\n"); fits_report_error(stderr, status); exit(1);}
 	      // Get the size
 	      fits_read_tdim(infptr,colNumIn,maxdim,&naxis,naxes,&status);
-	      if (status) {printf("have read tdim\n"); fits_report_error(stderr, status); exit(1);}
+	      printf("Number of axis = %d\n",naxis);
+	      if (status) {printf("have read tdim error: \n"); fits_report_error(stderr, status); exit(1);}
 	      
 	      // Must resize column
 	      newLen = 1;
 	      for (j=0;j<naxis;j++)
 		newLen*=naxes[j];
-	      
+	      printf("Modifying vector to be %d with column number = %d\n",(int)newLen,(int)colNumOut);
 	      fits_modify_vector_len(outfptr,colNumOut,newLen,&status);
 	      if (status) {printf("modify vector length error: \n"); fits_report_error(stderr, status); exit(1);}
 	      if (strcmp(colName,"DATA")==0)
@@ -389,12 +398,13 @@ void processExistingHDU(fitsfile *outfptr,fitsfile *infptr,int hduNum)
 		  sprintf(tdimStr,"TDIM%d",colNumOut);
 		  fits_delete_key(outfptr, tdimStr, &status);
 		  fits_write_tdim(outfptr,colNumOut,naxis,naxes,&status);
+		  if (status) {printf("write tdim %d %d (%s)\n",naxis,naxes[0],colName); fits_report_error(stderr, status); exit(1);}
 		}
 	      
 	      //      fits_write_tdim(outfptr,colNumOut,naxis,naxes,&status);
-	      if (status) {printf("write tdim %d %d (%s)\n",naxis,naxes[0],colName); fits_report_error(stderr, status); exit(1);}
 	      printf("Column %s (in = %d) (out = %d) size = %d\n",colName,colNumIn,colNumOut,naxis);
 	      fits_copy_col(infptr,outfptr,colNumIn,colNumOut,0,&status);
+	      if (status) {printf("error copying column\n"); fits_report_error(stderr, status); exit(1);}
 	      
 	      //fits_copy_col(infptr,outfptr,i+1,i+1,0,&status);
 	    }
