@@ -18,6 +18,7 @@ make install
 
 For configure, you may need to specifiy paths to the libraries and headers
 with e.g.:
+
 ./configure CFLAGS=-I/your/path/to/include LDFLAGS="-L/your/path/to/lib -lfftw3 -lcpgplot -lpgplot"
 
 ## Routines
