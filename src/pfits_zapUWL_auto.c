@@ -11,21 +11,41 @@
 #include <stdint.h>
 #include "fitsio.h"
 
+#define VNUM "v1.1"
 
 void help();
 void get_dm_tbin(dSetStruct *dSet,double *dm,double *tbin);
 void saveFile(float *datWts, int nsub, int nchan,dSetStruct *dSet);
-void autoZapTransmitters(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll);
-void autoZapSatellites(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll);
+void autoZapTransmitters(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL);
+void autoZapSatellites(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL);
 void autoZapWiFi(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll);
-void autoZapHandsets(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll);
-void autoZapAircraft(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll);
-void autoZapDigitisers(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll);
-void autoZapUnexplained(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll);
+void autoZapHandsets(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL);
+void autoZapAircraft(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL);
+void autoZapDigitisers(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL);
+void autoZapUnexplained(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL);
 void autoZapBandEdge(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,float bandEdge);
 
 void help()
 {
+  printf("\npfits_zapUWL_auto    %s\n",VNUM);
+  printf("PFITS version:       %s\n",SOFTWARE_VER);
+  printf("Author:              George Hobbs\n");
+  printf("Software to automatically zap known RFI in the UWL band\n");
+
+  printf("\nCommand line arguments:\n\n");
+  printf("-h                   This help\n");
+  printf("-f                   PSRFITS filename to zap\n");
+  printf("-tbin                TBIN\n");
+  printf("-zapAll              Remove all known RFI\n");
+  printf("-keepSL              Do not remove known spectral lines (use in conjunction with -zapAll)\n");
+
+  printf("\nExample 1: brute force zap of a pulsar observation\n\n");
+  printf("pfits_zapUWLauto -f <psrfits_file> -zapAll\n\n");
+
+  printf("\nExample 2: zap but preserve known spectral lines\n\n");
+  printf("pfits_zapUWLauto -f <psrfits_file> -zapAll -keepSL\n\n");
+  
+  exit(1);
 }
 
 
@@ -58,6 +78,7 @@ int main(int argc,char *argv[])
   float f0,f1;
   int polNum = 0;
   int zapAll=0;
+  int keepSL=0;
   float bandEdge = 10;
 
   // Searching for saturation
@@ -73,19 +94,25 @@ int main(int argc,char *argv[])
   float sigma2=5;
   float sigma3=5;
 
-  
+  if (argc==1)
+    help();
+
   // Initialise everything
   initialise(&dSet,debug);
 
   // Read inputs
   for (i=0;i<argc;i++)
     {
-      if (strcmp(argv[i],"-f")==0)
+      if (strcmp(argv[i],"-h")==0)
+	help();
+      else if (strcmp(argv[i],"-f")==0)
 	{setFilename(argv[++i],dSet,debug);}
       else if (strcmp(argv[i],"-tbin")==0)
 	sscanf(argv[++i],"%lf",&tbin);
       else if (strcasecmp(argv[i],"-zapAll")==0)
 	zapAll=1;
+      else if (strcasecmp(argv[i],"-keepSL")==0)
+	keepSL=1;
     }
        
   
@@ -130,13 +157,13 @@ int main(int argc,char *argv[])
     {      
       fits_read_col(dSet->fp,TFLOAT,colnum_datWts,ii+1,1,nchan,&n_fval,datWts+ii*nchan,&initflag,&status);
       // Automatic zapping
-      autoZapTransmitters(dSet,datWts+ii*nchan,nchan,chanbw,zapAll);
-      autoZapDigitisers(dSet,datWts+ii*nchan,nchan,chanbw,zapAll);
-      autoZapAircraft(dSet,datWts+ii*nchan,nchan,chanbw,zapAll);
-      autoZapSatellites(dSet,datWts+ii*nchan,nchan,chanbw,zapAll);
+      autoZapTransmitters(dSet,datWts+ii*nchan,nchan,chanbw,zapAll,keepSL);
+      autoZapDigitisers(dSet,datWts+ii*nchan,nchan,chanbw,zapAll,keepSL);
+      autoZapAircraft(dSet,datWts+ii*nchan,nchan,chanbw,zapAll,keepSL);
+      autoZapSatellites(dSet,datWts+ii*nchan,nchan,chanbw,zapAll,keepSL);
       autoZapWiFi(dSet,datWts+ii*nchan,nchan,chanbw,zapAll);
-      autoZapUnexplained(dSet,datWts+ii*nchan,nchan,chanbw,zapAll);
-      autoZapHandsets(dSet,datWts+ii*nchan,nchan,chanbw,zapAll);
+      autoZapUnexplained(dSet,datWts+ii*nchan,nchan,chanbw,zapAll,keepSL);
+      autoZapHandsets(dSet,datWts+ii*nchan,nchan,chanbw,zapAll,keepSL);
       autoZapBandEdge(dSet,datWts+ii*nchan,nchan,chanbw,zapAll,bandEdge);
 
       fits_read_col(dSet->fp,TFLOAT,colnum_datScl,ii+1,1,nchan*npol,&n_fval,datScl,&initflag,&status);
@@ -288,7 +315,7 @@ void autoZapBandEdge(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int z
   
 }
 
-void autoZapTransmitters(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll)
+void autoZapTransmitters(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL)
 {
   int maxTransmitters = 128;
   float f0[maxTransmitters],f1[maxTransmitters];
@@ -300,6 +327,7 @@ void autoZapTransmitters(dSetStruct *dSet,float *datWts,int nchan,float chanbw,i
   //
   // Fixed mobile transmission towers
   // We see persistent emission from these at all telescope pointing angles
+  // NOTE: we can check against INSPECTA's spectral lines list
   //
   f0[nT] = 758; f1[nT++] = 768;       //  Optus  
   f0[nT] = 768; f1[nT++] = 788;       //  Telstra
@@ -309,9 +337,25 @@ void autoZapTransmitters(dSetStruct *dSet,float *datWts,int nchan,float chanbw,i
   f0[nT] = 943.4; f1[nT++] = 951.8;   //  Optus
   f0[nT] = 953.7; f1[nT++] = 958.7;   //  Vodafone
   f0[nT] = 1081.7; f1[nT++] = 1086.7; // Aliased signal
-  f0[nT] = 1720; f1[nT++] = 1736.2;   // Aliased signal
+  if (keepSL==1)
+    {
+      // adjusted to account for spectral line at 1720.530
+      f0[nT] = 1725; f1[nT++] = 1736.2;   // Aliased signal
+    }
+  else
+    {
+      f0[nT] = 1720; f1[nT++] = 1736.2;   // Aliased signal
+    }
   f0[nT] = 1805; f1[nT++] = 1825;     //  Telstra
-  f0[nT] = 1845; f1[nT++] = 1865;     //  Optus
+  if (keepSL==1)
+    {
+      // adjusted to account for spectral line at 1849.634
+      f0[nT] = 1855; f1[nT++] = 1865;     //  Optus
+    }
+  else
+    {
+      f0[nT] = 1845; f1[nT++] = 1865;     //  Optus
+    }
   f0[nT] = 1973.7; f1[nT++] = 1991.0; // Aliased signal
   f0[nT] = 2110; f1[nT++] = 2120;     //  Vodafone
   f0[nT] = 2140; f1[nT++] = 2145;     //  Optus
@@ -362,7 +406,7 @@ void autoZapTransmitters(dSetStruct *dSet,float *datWts,int nchan,float chanbw,i
   printf(" ... have flagged %d channels\n",nzap);
 }
 
-void autoZapDigitisers(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll)
+void autoZapDigitisers(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL)
 {
   int maxTransmitters = 128;
   float f0[maxTransmitters],f1[maxTransmitters];
@@ -397,7 +441,7 @@ void autoZapDigitisers(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int
   printf(" ... have flagged %d channels\n",nzap);
 }
 
-void autoZapUnexplained(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll)
+void autoZapUnexplained(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL)
 {
   int maxTransmitters = 128;
   float f0[maxTransmitters],f1[maxTransmitters];
@@ -416,8 +460,12 @@ void autoZapUnexplained(dSetStruct *dSet,float *datWts,int nchan,float chanbw,in
   f0[nT] = 1880; f1[nT++] = 1904;
   f0[nT] = 2032.0; f1[nT++] = 2033.0;
   f0[nT] = 2063.0; f1[nT++] = 2064.0;
-  f0[nT] = 2077.0; f1[nT++] = 2078.0;
-  f0[nT] = 2079.0; f1[nT++] = 2080.0;
+  if (keepSL==0)
+    {
+      // spectral line at 2078.068 (CNCHO)
+      f0[nT] = 2077.0; f1[nT++] = 2078.0;
+      f0[nT] = 2079.0; f1[nT++] = 2080.0;
+    }
   f0[nT] = 2093.0; f1[nT++] = 2094.0;
   f0[nT] = 2160.0; f1[nT++] = 2161;
   f0[nT] = 2191.0; f1[nT++] = 2192;
@@ -444,7 +492,7 @@ void autoZapUnexplained(dSetStruct *dSet,float *datWts,int nchan,float chanbw,in
   printf(" ... have flagged %d channels\n",nzap);
 }
 
-void autoZapSatellites(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll)
+void autoZapSatellites(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL)
 {
   int maxTransmitters = 128;
   float f0[maxTransmitters],f1[maxTransmitters];
@@ -456,16 +504,33 @@ void autoZapSatellites(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int
   //
   // Satellites that we always see
   //
-  f0[nT] = 1618; f1[nT++] = 1626.5; // Iridium
+  if (keepSL==0)
+    {
+      // spectral lines at 1624.518 and 1626.161 (^17OH)
+      f0[nT] = 1618; f1[nT++] = 1626.5; // Iridium
+    }
   if (zapAll==1)
     {
       f0[nT] = 1164; f1[nT++] = 1189;
       f0[nT] = 1189; f1[nT++] = 1214;
       f0[nT] = 1240; f1[nT++] = 1260;
       f0[nT] = 1260; f1[nT++] = 1300;
-      f0[nT] = 1525; f1[nT++] = 1646.5;  // Inmarsat - this is too wide
-    }
-  
+      if (keepSL==1)
+        { 
+	  // exclude spectral lines          
+	  f0[nT] = 1525; f1[nT++] = 1533;    // Inmarsat
+	  f0[nT] = 1544; f1[nT++] = 1566;    // Inmarsat
+	  f0[nT] = 1574; f1[nT++] = 1580;    // Inmarsat
+	  f0[nT] = 1588; f1[nT++] = 1606;    // Inmarsat
+	  f0[nT] = 1616; f1[nT++] = 1620;    // Inmarsat
+	  f0[nT] = 1630; f1[nT++] = 1633;    // Inmarsat
+	  f0[nT] = 1643; f1[nT++] = 1646.5;  // Inmarsat
+        }
+      else
+        {
+          f0[nT] = 1525; f1[nT++] = 1646.5;  // Inmarsat - this is too wide
+	}
+    } 
   printf("Number of satellite signals being removed = %d\n",nT);
   
   for (i=0;i<nchan;i++)
@@ -517,7 +582,7 @@ void autoZapWiFi(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAl
   printf(" ... have flagged %d channels\n",nzap);
 }
 
-void autoZapHandsets(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll)
+void autoZapHandsets(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL)
 {
   int maxTransmitters = 128;
   float f0[maxTransmitters],f1[maxTransmitters];
@@ -528,16 +593,40 @@ void autoZapHandsets(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int z
 
   if (zapAll==1)
     {
-      f0[nT] = 703;    f1[nT++] = 713;    // 4G Optus
-      f0[nT] = 704.5;  f1[nT++] = 708;    // Alias
-      f0[nT] = 713;    f1[nT++] = 733;
+      if (keepSL==1)
+        {
+          f0[nT] = 706;    f1[nT++] = 713;    // 4G Optus
+          f0[nT] = 713;    f1[nT++] = 720;
+          f0[nT] = 728;    f1[nT++] = 733;
+	}
+      else
+        {
+	  f0[nT] = 703;    f1[nT++] = 713;    // 4G Optus
+          f0[nT] = 704.5;  f1[nT++] = 708;    // Alias
+          f0[nT] = 713;    f1[nT++] = 733;
+        }
       f0[nT] = 825.1;  f1[nT++] = 829.9; // Vodafone 4G
-      f0[nT] = 830.05; f1[nT++] = 844.95; // Telstra 3G
+      if (keepSL==1)
+        {
+          f0[nT] = 838; f1[nT++] = 844.95; // Telstra 3G
+        }
+      else
+        {
+          f0[nT] = 830.05; f1[nT++] = 844.95; // Telstra 3G
+        }
       f0[nT] = 847.6;  f1[nT++] = 848.0;
       f0[nT] = 898.4;  f1[nT++] = 906.4;  // Optus 3G
       f0[nT] = 906.8;  f1[nT++] = 915.0;  // Vodafone 3G
       f0[nT] = 953;    f1[nT++] = 960.1;  // Alias
-      f0[nT] = 1710;   f1[nT++] = 1725;  // 4G Telstra
+      if (keepSL==1)
+        {
+          f0[nT] = 1710;   f1[nT++] = 1716;  // 4G Telstra
+          f0[nT] = 1724;   f1[nT++] = 1725;  // 4G Telstra
+        }
+      else
+        {
+          f0[nT] = 1710;   f1[nT++] = 1725;  // 4G Telstra
+	}
       f0[nT] = 1745;   f1[nT++] = 1755;  // 4G Optus
       f0[nT] = 2550;   f1[nT++] = 2570;  // 4G Optus
       
@@ -562,7 +651,7 @@ void autoZapHandsets(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int z
 }
 
 
-void autoZapAircraft(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll)
+void autoZapAircraft(dSetStruct *dSet,float *datWts,int nchan,float chanbw,int zapAll,int keepSL)
 {
   int maxTransmitters = 128;
   float f0[maxTransmitters],f1[maxTransmitters];
