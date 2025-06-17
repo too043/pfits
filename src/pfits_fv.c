@@ -71,6 +71,7 @@ int main(int argc,char *argv[])
       char obsBW[1024];
       char obsNCHAN[1024];
       char srcName[1024];
+      char calFreq[1024];
       int i;
 
       for (i=0;i<nFile;i++)
@@ -84,6 +85,7 @@ int main(int argc,char *argv[])
 	  fits_read_key(fp,TSTRING,"PROJID",projID,NULL,&status);
 	  fits_read_key(fp,TSTRING,"OBSFREQ",obsFreq,NULL,&status);
 	  fits_read_key(fp,TSTRING,"OBSBW",obsBW,NULL,&status);
+	  fits_read_key(fp,TSTRING,"CAL_FREQ",calFreq,NULL,&status);
 	  fits_read_key(fp,TSTRING,"OBSNCHAN",obsNCHAN,NULL,&status);
 	  printf("%-20.20s %-15.15s %-8.8s %-5.5s %-5.5s %-5.5s %-5.5s ",fname,srcName,obsMode,projID,obsFreq,obsBW,obsNCHAN);
 	  if (strcmp(obsMode,"SEARCH")==0)
@@ -96,7 +98,7 @@ int main(int argc,char *argv[])
 	      fits_read_key(fp,TSTRING,"NBITS",nbits,NULL,&status);
 	      fits_read_key(fp,TSTRING,"NPOL",npol,NULL,&status);
 	      fits_read_key(fp,TSTRING,"TBIN",tsamp,NULL,&status);
-	      printf("nbits = %s npol = %s tbin = %s",nbits,npol,tsamp);
+	      printf("nbits = %s npol = %s tbin = %s calFreq = %s",nbits,npol,tsamp,calFreq);
 	    }
 
 	  printf("\n");

@@ -28,7 +28,7 @@ int main(int argc,char *argv[])
   int ntrial = 20;
   unsigned int **image;
   float *plotImage;
-  double period = 0.016052722944505;
+  double period = 0.089389421366021; // 0.016052722944505;
   double tval;
   float tr[6];
   float minVal,maxVal;
@@ -73,7 +73,7 @@ int main(int argc,char *argv[])
 	  tval = j*nsblk*tsamp+i*tsamp;
 	  for (ii=0;ii<ntrial;ii++)
 	    {
-	      ibin = (int)((tval/(period+ii*1e-7)-(int)(tval/(period+ii*1e-7)))*nbin);
+	      ibin = (int)((tval/(period+ii*1e-5)-(int)(tval/(period+ii*1e-5)))*nbin);
 	      for (k=0;k<nFreqSamples;k++)
 		{
 		  image[ii][ibin*nchan+k]+=(int)(dataVals[i*nchan+k]*2+5);
@@ -92,7 +92,7 @@ int main(int argc,char *argv[])
 	}
     }
   printf("min/max = %g/%g\n",minVal,maxVal);
-  if (1==0)
+  if (1==1)
     {
       tr[0] = 0; tr[1] = 0; tr[2] = 1;
       tr[3] = 0; tr[4] = 1; tr[5] = 0;

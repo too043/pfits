@@ -50,7 +50,7 @@ int main(int argc,char *argv[])
   FILE *fout;
   int maxNsub = -1;
   int nbeam=1;
-  float delta=0.02;
+  float delta=0.01;
   int plotTimeSamples = 128;
   int curPos=0;
   int subintCount=0;
@@ -155,7 +155,8 @@ int main(int argc,char *argv[])
       cpgsvp(0,0.15,0.9,1.0);
       cpgswin(0,1,0,1);
       cpgscf(2);
-      cpgsch(0.7);
+      //      cpgsch(0.7);
+      cpgsch(1.4);
       cpgslw(2);
       //      sprintf(str,"%.3f sec",curPos*dSet[0]->head->tsamp);
       //      cpgtext(0.1,0.1,str);
@@ -235,14 +236,16 @@ int main(int argc,char *argv[])
 	{
 	  cpgsvp(0.2+delta,0.4-delta,0.0+delta,0.2-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 9
 	  cpggray(plotBuffer[8],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
-	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 9");
+	  //	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 9");
+	  cpgtext(x0-3000,nFreqSamples-nFreqSamples*0.2,"Beam 9");
 	}
 
       if (nbeam >= 10)
 	{
 	  cpgsvp(0.6+delta,0.8-delta,0.0+delta,0.2-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 10
 	  cpggray(plotBuffer[9],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
-	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 10");
+	  //	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 10");
+	  cpgtext(x0+4600,nFreqSamples-nFreqSamples*0.2,"Beam 10");
 	}
 
       if (nbeam >= 11)
@@ -256,14 +259,16 @@ int main(int argc,char *argv[])
 	{
 	  cpgsvp(0.6+delta,0.8-delta,0.8+delta,1.0-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 12
 	  cpggray(plotBuffer[11],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
-	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 12");
+	  //	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 12");
+	  cpgtext(x0+4600,nFreqSamples-nFreqSamples*0.2,"Beam 12");
 	}
 
       if (nbeam >= 13)
 	{
 	  cpgsvp(0.2+delta,0.4-delta,0.8+delta,1.0-delta); cpgswin(x0,x1,0,nFreqSamples);  cpgbox("ABCTS",0,0,"ABCTS",0,0);  // Beam 13
 	  cpggray(plotBuffer[12],nchan,plotTimeSamples,1,nchan,1,plotTimeSamples,0,1,tr);
-	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 13");
+	  //	  cpgtext(x0,nFreqSamples+nFreqSamples*0.05,"Beam 13");
+	  cpgtext(x0-3000,nFreqSamples-nFreqSamples*0.2,"Beam 13");
 	}
       printf("Closing up\n");
       //      scanf("%s",&temp);

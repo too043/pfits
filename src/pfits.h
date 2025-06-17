@@ -24,7 +24,6 @@
 
 #define FILE_LEN 128
 #define MAX_CHANNELS 262144
-#define SOFTWARE_VER "v1.1"
 
 // Structure containing the PSRFITS header information
 typedef struct headerStruct {

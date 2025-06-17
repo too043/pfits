@@ -185,12 +185,12 @@ int main(int argc,char *argv[])
       cpgslw(2);
       cpgscf(2);
       nDedispSamp = (int)(tdispWidth/dSet->head->tsamp);
-      /*
+      
       printf("nDedispSamp = %d\n",nDedispSamp);
       printf("nchan = %d\n",(int)dSet->head->nchan);
       printf("nTimeSamples = %d\n",nTimeSamples);
       printf("nbin = %d\n",nbin);
-      */
+      
       for (i=0;i<dSet->head->nchan;i++)
 	{
 	  for (j=0;j<nTimeSamples/nbin;j++)
@@ -353,7 +353,7 @@ int main(int argc,char *argv[])
 
       if (publish == 2)
 	{
-	  cpgsvp(0.1,0.9,0.15,0.45);	  
+	  cpgsvp(0.1,0.9,0.15,0.44);	  
 	  cpgswin(tdispCentre-tdispWidth/2.,tdispCentre+tdispWidth/2.,tr[3]+10,tr[3]+nchan*tr[4]-10);
 	  cpgbox("ABCTNS",0,0,"ABNCTS",0,0);
 	  cpglab("Time from start of observation (s)","Frequency (MHz)","");
@@ -362,9 +362,9 @@ int main(int argc,char *argv[])
 	      for (j=0;j<nTimeSamples/nbin;j++)
 		{
 		  plotArrBin[j*dSet->head->nchan+i]=0;
-	      for (k=0;k<nbin;k++)
-		plotArrBin[j*dSet->head->nchan+i]+=plotArr[(nbin*j+k)*dSet->head->nchan+i];
-	      plotArrBin[j*dSet->head->nchan+i]/=nbin;
+		  for (k=0;k<nbin;k++)
+		    plotArrBin[j*dSet->head->nchan+i]+=plotArr[(nbin*j+k)*dSet->head->nchan+i];
+		  plotArrBin[j*dSet->head->nchan+i]/=nbin;
 		}
 	    }
 	  tr[0] = t1;

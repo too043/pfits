@@ -75,6 +75,9 @@ int main(int argc,char *argv[])
   int useWts=0;
   float f1=-1,f2=-1;
   int out2pol=0;
+  char projid[1024];
+  char observer[1024];
+  int hdutype;
   
   // Initialise everything
   initialise(&dSet,debug);
@@ -105,7 +108,10 @@ int main(int argc,char *argv[])
          
   pfitsOpenFile(dSet,debug);
   pfitsLoadHeader(dSet,debug);
-
+  fits_movabs_hdu(dSet->fp,1,&hdutype,&status);
+  fits_read_key(dSet->fp,TSTRING,"PROJID",projid,NULL,&status);
+  fits_read_key(dSet->fp,TSTRING,"OBSERVER",observer,NULL,&status);
+  
   nchan = dSet->head->nchan;
   nbin  = dSet->head->nbin;
   nsub  = dSet->head->nsub;
@@ -141,7 +147,7 @@ int main(int argc,char *argv[])
   ze  = (float *)malloc(sizeof(float)*nsub);
 
   for (i=0;i<nsub;i++)
-    timeVal[i] = dSet->head->stt_smjd;
+    timeVal[i] = dSet->head->stt_imjd + (dSet->head->stt_smjd)/86400.0L;
    
   
   fits_movnam_hdu(dSet->fp,BINARY_TBL,"SUBINT",1,&status);
@@ -208,17 +214,17 @@ int main(int argc,char *argv[])
 		    }
 		}
 	      if (out2pol==0)
-		fprintf(fout,"%.5d %.5f %g %g\n",ii,dSet->head->chanFreq[i],spectrum[ii][i],datWts[i]);
+		fprintf(fout,"%.5d %.5f %g %g %.7f %.7f %.7f %.7f %s %s %s\n",ii,dSet->head->chanFreq[i],spectrum[ii][i],datWts[i],timeVal[ii],(timeVal[ii]-(int)timeVal[ii])*86400.0,az[ii],ze[ii],dSet->head->source,projid,observer);
 	      else
-		fprintf(fout,"%.5d %.5f %g %g %g\n",ii,dSet->head->chanFreq[i],val1,val2,datWts[i]);
+		fprintf(fout,"%.5d %.5f %g %g %.7f %.7f %.7f %.7f %.7f %s %s %s\n",ii,dSet->head->chanFreq[i],val1,val2,datWts[i],timeVal[ii],(timeVal[ii]-(int)timeVal[ii])*86400.0,az[ii],ze[ii],dSet->head->source,projid,observer);
 	      //	    printf("%.5f %g %g\n",dSet->head->chanFreq[i],datScl[i],
 	      //datScl[i+nchan],datScl[i+2*nchan],datScl[i+3*nchan]);
 	    }
 	  fprintf(fout,"\n");
 	  if (out2pol==0)
-	    printf("%s %.5d %g %g %g [AzZe] %g\n",dSet->fileName,ii,mean4/(double)n4,az[ii],ze[ii],timeVal[ii]);
+	    printf("%s %.5d %g %g %g [AzZe] %.5f %g\n",dSet->fileName,ii,mean4/(double)n4,az[ii],ze[ii],timeVal[ii],(timeVal[ii]-(int)timeVal[ii])*86400.0);
 	  else
-	    printf("%s %.5d %g %g %g %g [AzZe] %g\n",dSet->fileName,ii,mean4_1/(double)n4,mean4_2/(double)n4,az[ii],ze[ii],timeVal[ii]);
+	    printf("%s %.5d %g %g %g %g [AzZe2] %.5f %g\n",dSet->fileName,ii,mean4_1/(double)n4,mean4_2/(double)n4,az[ii],ze[ii],timeVal[ii],(timeVal[ii]-(int)timeVal[ii])*86400.0);
 	}
 
     }

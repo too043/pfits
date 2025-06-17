@@ -81,10 +81,10 @@ void drawColourMap(dSetStruct *dSet,int pol)
   int nFreqSamples;
   long nplot=0;
   int dt = 64; // This is the offset in samples
-  long tmax = 5*8192;
+  long tmax = 4096*457; // 5*8192;
   long plotPts=2048;
-  int s0=420;
-  int s1=430;
+  int s0=0;
+  int s1=457;
   printf("nchan = %d\n",nchan);
   
   plotArr = (float *)malloc(sizeof(float)*nchan*nsblk*((s1-s0)+1));

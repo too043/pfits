@@ -14,6 +14,9 @@
  * along with pfits.  If not, see <http://www.gnu.org/licenses/>. 
 */
 
+
+// /usr/bin/gcc -lm -o pfits_plot pfits_plot.c pfits_setup.c pfits_loader.c  -lcfitsio -lcpgplot
+
 //  gcc -lm -o pfits_plot pfits_plot.c pfits_setup.c pfits_loader.c -I/Users/hob044/hob044/software/cfitsio/include/ -L/Users/hob044/hob044/software/cfitsio/lib -lcfitsio -lcpgplot -lpgplot
 //gcc -lm -o pfits_plot pfits_plot.c pfits_setup.c -I/Users/hob044/hob044/software/cfitsio/include/ -L/Users/hob044/hob044/software/cfitsio/lib -lcfitsio 
 
@@ -47,17 +50,21 @@ typedef struct plotStruct {
   int polPlot;      // 1 = different pols on different panels. 2 = different pols on same panel (p1,p2,p3,p4)
 } plotStruct;
 
-void doPlot(dSetStruct **dSet,int nFiles,plotStruct **plot,int debug,int offScl);
+void doPlot(dSetStruct **dSet,int nFiles,plotStruct **plot,int debug,int offScl,int nohead,int interact);
 void initialisePlot(plotStruct *plot);
 void loadPlotData(int nFiles,float **plotArr_p0,float **plotArr_p1,float **plotArr_p2,float **plotArr_p3,plotStruct **plot,dSetStruct **dSet,int debug,int offScl);
 void setMinMaxVals(dSetStruct **dSet,plotStruct **plot,int nFiles,int nchan,int nsblk,float **plotArr_p0,float **plotArr_p1,float **plotArr_p2,float **plotArr_p3);
 void drawPlot(int nFiles,int fileNum,int pol,dSetStruct **dSet,plotStruct **plot,float **plotArr_p0,
-	      float **plotArr_p1,float **plotarr_p2,float **plotArr_p3);
+	      float **plotArr_p1,float **plotarr_p2,float **plotArr_p3,int nohead);
 void drawColourMap(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
-		   float *plotArr_p1,float *plotArr_p2,float *plotArr_p3);
+		   float *plotArr_p1,float *plotArr_p2,float *plotArr_p3,int nohead);
 void drawLinePlot(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
 		  float *plotArr_p1,float *plotArr_p2,float *plotArr_p3);
 
+void help()
+{
+  exit(1);
+}
 
 int main(int argc,char *argv[])
 {
@@ -70,14 +77,24 @@ int main(int argc,char *argv[])
   float t1=-1,t2=-1;
   float s1=-1,s2=-1;
   int offScl=0;
+  int nohead=0;
+  int interact=1;
+
   
   // Count number of files
   for (i=0;i<argc;i++)
     {
       if (strcmp(argv[i],"-f")==0)
 	nFiles++;
+      else if (strcmp(argv[i],"-auto")==0)
+	interact=0;
       else if (strcmp(argv[i],"-scale")==0)
 	offScl=1;
+    }
+  if (argc == 1 || nFiles==0)
+    {
+      printf("ERROR: need to use the -f <filename> option to specify a filename\n");
+      help();
     }
 
 
@@ -103,6 +120,7 @@ int main(int argc,char *argv[])
       else if (strcmp(argv[i],"-s2")==0) sscanf(argv[++i],"%f",&s2);
       else if (strcmp(argv[i],"-t1")==0) sscanf(argv[++i],"%f",&t1);
       else if (strcmp(argv[i],"-t2")==0) sscanf(argv[++i],"%f",&t2);
+      else if (strcmp(argv[i],"-nohead")==0) nohead=1;
     }
 
   // Open the files and load header information
@@ -152,7 +170,7 @@ int main(int argc,char *argv[])
 
 
   // Do the plot
-  doPlot(dSet,nFiles,plot,debug,offScl);
+  doPlot(dSet,nFiles,plot,debug,offScl,nohead,interact);
  
   // Close the file
   //  pfitsCloseFile(dSet,debug);
@@ -168,7 +186,7 @@ int main(int argc,char *argv[])
   free(plot);
 }
 
-void doPlot(dSetStruct **dSet,int nFiles,plotStruct **plot,int debug,int offScl)
+void doPlot(dSetStruct **dSet,int nFiles,plotStruct **plot,int debug,int offScl,int nohead,int interact)
 {
   float **plotArr_p0;
   float **plotArr_p1;
@@ -319,13 +337,13 @@ void doPlot(dSetStruct **dSet,int nFiles,plotStruct **plot,int debug,int offScl)
 	      cpgpanl(plot[k]->xpanelNum,plot[k]->ypanelNum);
 	      if (plot[k]->polPlot==1)
 		{
-		  if (p==0) drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);
-		  if (p==1) {cpgpanl(plot[k]->xpanelNum+1,plot[k]->ypanelNum); drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);}
-		  if (p==2) {cpgpanl(plot[k]->xpanelNum,plot[k]->ypanelNum+1);drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);}
-		  if (p==3) {cpgpanl(plot[k]->xpanelNum+1,plot[k]->ypanelNum+1); drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);}
+		  if (p==0) drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3,nohead);
+		  if (p==1) {cpgpanl(plot[k]->xpanelNum+1,plot[k]->ypanelNum); drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3,nohead);}
+		  if (p==2) {cpgpanl(plot[k]->xpanelNum,plot[k]->ypanelNum+1);drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3,nohead);}
+		  if (p==3) {cpgpanl(plot[k]->xpanelNum+1,plot[k]->ypanelNum+1); drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3,nohead);}
 		}
 	      else if (plot[k]->polPlot==2)
-		drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3);
+		drawPlot(nFiles,k,p,dSet,plot,plotArr_p0,plotArr_p1,plotArr_p2,plotArr_p3,nohead);
 	      if (plotWifi==1)
 		{
 		  float fx[2],fy[2];
@@ -346,20 +364,53 @@ void doPlot(dSetStruct **dSet,int nFiles,plotStruct **plot,int debug,int offScl)
 		  fx[0] = plot[k]->minx;
 		  fx[1] = plot[k]->maxx;
 		  fy[0] = fy[1] = (dSet[0]->head->chanFreq[0] + dSet[0]->head->chanFreq[dSet[0]->head->nchan-1])/2.0;
-		  printf("IN HERE %g %g %g %g\n",fx[0],fx[1],fy[0],fy[1]);
 		  cpgsci(2); cpgline(2,fx,fy); cpgsci(1);
 		}
 	    }	  
 	}
   
-      
-      if (strcmp(grDev,"/xs")==0)
+      if (strcmp(grDev,"/xs")==0 && interact==1)
 	{
 	  cpgcurs(&mx,&my,&key);
 	  if (key=='c')
 	    {
 	      for (i=0;i<nFiles;i++)
 		plot[i]->colourPlot*=-1;
+	    }
+	  else if (key=='!') // Maximum signal
+	    {
+	      double max = 0;
+	      long maxII=0;
+	      long maxJJ=0;
+	      long maxI=0;
+	      int ii,jj;
+	      double time,freq;
+	      //      tr[0] = dSet->head->nsblk*plot->t1*dSet->head->tsamp;
+	      //      tr[1] = 0;
+	      //      tr[2] = dSet->head->tsamp;
+	      
+	      for (i=0;i<nFiles;i++)
+		{
+		  printf("NSBLK = %d, tsamp = %g\n",dSet[i]->head->nsblk,dSet[i]->head->tsamp);
+		  
+
+		  for (ii=0;ii<plot[i]->nTimeSamples;ii++)
+		    {
+		      for (jj=0;jj<nchan;jj++)
+			{
+			  if (plotArr_p0[i][ii*nchan+jj] > max)
+			    {
+			      max = plotArr_p0[i][ii*nchan+jj];
+			      maxII = ii;
+			      maxJJ = jj;
+			      maxI  = i;
+						  
+			    }
+			}
+		    }
+		}
+	      printf("Maximum value in file %d, sample %d (time = %g) and channel %d (frequency = %g) value = %g\n",maxI,maxII, dSet[maxI]->head->nsblk*plot[maxI]->t1*dSet[maxI]->head->tsamp + maxII*dSet[maxI]->head->tsamp,maxJJ,dSet[maxI]->head->chanFreq[0] + dSet[maxI]->head->chanbw * maxJJ, max);
+
 	    }
 	  else if (key=='o')
 	    {
@@ -480,6 +531,43 @@ void doPlot(dSetStruct **dSet,int nFiles,plotStruct **plot,int debug,int offScl)
 		plot[i]->maxVal = newMax;
 	      
 	    }	  
+	  else if (key=='v')
+	    {
+	      float mx2,my2;
+	      if (nFiles != 1)
+		{
+		  printf("Sorry: v option only works for 1 file data\n");
+		}
+	      else
+		{
+		  int ii,jj;
+		  float t,f;
+		  double sum;
+		  int nc;
+		  FILE *fout;
+
+		  fout = fopen("spectrum_pfits.txt","w");
+		  cpgband(4,1,mx,my,&mx2,&my2,&key);
+		  for (jj=0;jj<nchan;jj++)
+		    {
+		      f = dSet[0]->head->chanFreq[0] + dSet[0]->head->chanbw * jj;
+		      nc = 0;
+		      sum = 0;
+		      for (ii=0;ii<plot[0]->nTimeSamples;ii++)
+			{
+			  t = dSet[0]->head->nsblk*plot[0]->t1*dSet[0]->head->tsamp + ii*dSet[0]->head->tsamp;
+			  if (t > mx && t <= mx2)
+			    {
+			      sum+=plotArr_p0[0][ii*nchan+jj];
+			      nc++;
+			    }
+			}
+		      printf("%d %g %g\n",jj,f,sum/(double)nc);
+		      fprintf(fout,"%d %g %g\n",jj,f,sum/(double)nc);
+		    }
+		  fclose(fout);
+		}
+	    }
 	  else if (key=='M')
 	    {
 	      float newMin;
@@ -537,11 +625,16 @@ void doPlot(dSetStruct **dSet,int nFiles,plotStruct **plot,int debug,int offScl)
 	  scanf("%f",&dmVal_time[nDM_curve++]);
 	  } */
 	}
+      else if (interact==0)
+	{
+	  key='q';
+	}
       else
 	strcpy(grDev,"/xs");
+  
   } while (key!='q');
 
-      cpgend();
+  cpgend();
   for (i=0;i<nFiles;i++)
     {
       free(plotArr_p0[i]);
@@ -678,11 +771,11 @@ void setMinMaxVals(dSetStruct **dSet,plotStruct **plot,int nFiles,int nchan,int 
 }
 
 void drawPlot(int nFiles,int fileNum,int pol,dSetStruct **dSet,plotStruct **plot,float **plotArr_p0,
-	      float **plotArr_p1,float **plotArr_p2,float **plotArr_p3)
+	      float **plotArr_p1,float **plotArr_p2,float **plotArr_p3,int nohead)
 {
   if (dSet[fileNum]->head->nchan > 1)
     {
-      drawColourMap(dSet[fileNum],pol,plot[fileNum],plotArr_p0[fileNum],plotArr_p1[fileNum],plotArr_p2[fileNum],plotArr_p3[fileNum]);
+      drawColourMap(dSet[fileNum],pol,plot[fileNum],plotArr_p0[fileNum],plotArr_p1[fileNum],plotArr_p2[fileNum],plotArr_p3[fileNum],nohead);
     }
   else
     drawLinePlot(dSet[fileNum],pol,plot[fileNum],plotArr_p0[fileNum],plotArr_p1[fileNum],plotArr_p2[fileNum],plotArr_p3[fileNum]);
@@ -723,7 +816,7 @@ void drawLinePlot(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
 }
 
 void drawColourMap(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
-		   float *plotArr_p1,float *plotArr_p2,float *plotArr_p3)
+		   float *plotArr_p1,float *plotArr_p2,float *plotArr_p3,int nohead)
 {
   float tr[6];
   int   nchan    = dSet->head->nchan;
@@ -733,7 +826,6 @@ void drawColourMap(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
   float heat_g[] = {0.0, 0.0, 0.5, 1.0, 1.0};
   float heat_b[] = {0.0, 0.0, 0.0, 0.3, 1.0};
   char  title[128];
-
   printf("Drawing a colour map\n");
   
   if (plot->xPlotType==1)
@@ -769,7 +861,10 @@ void drawColourMap(dSetStruct *dSet,int pol,plotStruct *plot,float *plotArr_p0,
 
 
     }
-  sprintf(title,"%s (subint %.0f-%.0f)",dSet->fileName,plot->t1,plot->t2);
+  if (nohead==0)
+    sprintf(title,"%s (subint %.0f-%.0f)",dSet->fileName,plot->t1,plot->t2);
+  else
+    strcpy(title,"");
   
   if (plot->xPlotType==1)
     cpglab("Sample","Frequency (MHz)",title);            

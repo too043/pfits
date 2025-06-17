@@ -23,7 +23,7 @@
 #include <cpgplot.h>
 #include "fitsio.h"
 
-void doPlot(float *sum,float *min,float *max,int totCount,int *histogramTot,float *meanSub,int nchan,dSetStruct *dSet,int nsub,int plot,char *grDev,char *heading,char *recordValues);
+void doPlot(float *sum,float *min,float *max,int totCount,long int *histogramTot,float *meanSub,int nchan,dSetStruct *dSet,int nsub,int plot,char *grDev,char *heading,char *recordValues);
 
 int main(int argc,char *argv[])
 {
@@ -42,7 +42,7 @@ int main(int argc,char *argv[])
   long totCount;
   int sub0,sub1;
   int pol=0;
-  int histogramTot[255];
+  long int histogramTot[255];
   int offScl=0;
   char heading[1024];
   char recordValues[1024]="NULL";
@@ -143,7 +143,7 @@ int main(int argc,char *argv[])
   deallocateMemory(&dSet,debug);
 }
 
-void doPlot(float *sum,float *min,float *max,int totCount,int *histogramTot,float *meanSub,int nchan,dSetStruct *dSet,int nsub,int plot,char *grDev,char *heading,char *recordValues)
+void doPlot(float *sum,float *min,float *max,int totCount,long int *histogramTot,float *meanSub,int nchan,dSetStruct *dSet,int nsub,int plot,char *grDev,char *heading,char *recordValues)
 {
   float xVal[nchan];
   float yVal[nchan];
@@ -163,6 +163,7 @@ void doPlot(float *sum,float *min,float *max,int totCount,int *histogramTot,floa
     {
       histPlotX[i] = i;
       histPlotY[i] = histogramTot[i];
+      printf("histogram: %d %g\n",i,histPlotY[i]);
       if (maxHist < histPlotY[i]) maxHist = histPlotY[i];
     }
   

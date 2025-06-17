@@ -13,6 +13,7 @@
  * You should have received a copy of the GNU General Public License 
  * along with pfits.  If not, see <http://www.gnu.org/licenses/>. 
 */
+//  gcc -lm -o pfits_dedisperse pfits_dedisperse.c pfits_setup.c pfits_loader.c -I/Users/hob044/hob044/software/cfitsio/include/ -L/Users/hob044/hob044/software/cfitsio/lib -lcfitsio -lcpgplot -lpgplot -lfftw3
 
 //gcc -lm -o pfits_plot pfits_plot.c pfits_setup.c -I/Users/hob044/hob044/software/cfitsio/include/ -L/Users/hob044/hob044/software/cfitsio/lib -lcfitsio 
 
@@ -116,7 +117,7 @@ void dedisperse(dSetStruct *dSet,fitsfile *outfptr,float dm,float fref,int debug
   float fChan[dSet->head->nchan];
   float chanbw = dSet->head->chanbw;
 
-  int dedispMethod = 3;
+  int dedispMethod = 2;
   
   // Should read from the file !!!!
   for (i=0;i<dSet->head->nchan;i++)

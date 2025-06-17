@@ -59,7 +59,7 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
   nsblk = dSet->head->nsblk;
   nbits = dSet->head->nbits;
   tsamp = dSet->head->tsamp;
-  printf("Using: %d %d %d %d %g\n",nchan,npol,nsblk,nbits,tsamp);
+  //  printf("Using: %d %d %d %d %g\n",nchan,npol,nsblk,nbits,tsamp);
   if (rangeType==1)
     {
       s0 = (long)t1;
@@ -82,17 +82,16 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
       lastSamp = (int)((t2-s1*tsamp*nsblk)/tsamp+0.5);
     }
   if (debugFlag==1) printf("Entering pfits_read1pol_float\n");
-  printf("First and last are %d %d %d %d\n",firstSamp,lastSamp,s0,s1);
+  //  printf("First and last are %d %d %d %d\n",firstSamp,lastSamp,s0,s1);
   if (nbits <= 8)
     samplesperbyte = 8/nbits;    
   else
     samplesperbyte = 1;
-  printf("Got here\n");
+
   if (dSet->headerMemorySet==1 && dSet->fileOpen==1)
     {
       int colnum_datoffs,colnum_datscl;
       
-      printf("In this bit\n");
       fits_movnam_hdu(dSet->fp,BINARY_TBL,"SUBINT",1,&status);
       if (status){printf("Unable to find the SUBINT table\n"); exit(1);}
       fits_get_colnum(dSet->fp,CASEINSEN,"DATA",&colnum,&status);
@@ -110,12 +109,14 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
       else
 	fVals = (float *)malloc(sizeof(float)*nchan/samplesperbyte); // Note: only reading one polarisation
 	//	iVals = (unsigned int *)malloc(sizeof(unsigned int)*nchan/samplesperbyte); // Note: only reading one polarisation
+	
       for (subint=s0;subint<=s1;subint++)
 	{
 	  fits_read_col(dSet->fp,TFLOAT,colnum_datoffs,subint+1,1,nchan,&n_fval,datOffs,&initflag,&status);
 	  fits_read_col(dSet->fp,TFLOAT,colnum_datscl,subint+1,1,nchan,&n_fval,datScl,&initflag,&status);
   
-	  printf("Reading subint %d\n",subint);
+	  printf("Reading subint %ld %d %d/%d\n",subint,(int)s1,(int)(subint-s0),(int)(s1-s0));
+	  //	  printf("s1 = %d\n",(int)s1);
 	  // Read in 1 subint of data for the specified (polNum) polarisation
 	  if (subint==s0)
 	    i0 = firstSamp;
@@ -132,24 +133,23 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
 	      //	      printf("Loading %d\n",i);
 	      if (nbits <= 8)
 		{
-		  //		  if (subint==163) printf("a\n");
-		  //		  printf("Reading bytes\n");
+		  
 		  fits_read_col_byt(dSet->fp,colnum,
 				    subint+1,
 				    1+i*npol*nchan/samplesperbyte+polNum*nchan/samplesperbyte,
 				    nchan/samplesperbyte,
 				    nval,cVals,&initflag,&status);
-		  //		  for (j=0;j<128;j++)
-		  //		    printf("Have loaded %d\n",(int)cVals[j]);
-		  //		  if (subint==163) printf("b %ld\n",scount*nchan);
-
+ 
 		  // Issue here if NCHAN from the header isn't the same as the NCHAN passed through in "out"
 		  //		  printf("Converting to floats %d %d %d\n",scount,scount*nchan,samplesperbyte);
 		  pfits_bytesToFloats(samplesperbyte,nchan,cVals,out+scount*nchan);
 		  if (offsScl==1)
 		    {
-		      for (j=0;j<nchan;j++) 
+		      for (j=0;j<nchan;j++)
 			out[scount*nchan+j]=((out[scount*nchan+j]-dSet->head->zeroOff)*datScl[j])+datOffs[j];
+		      
+		      //			out[scount*nchan+j]=((out[scount*nchan+j]-dSet->head->zeroOff + datOffs[j])*datScl[j]);
+		      
 		    }
 		}
 	      else if (nbits == 16)
@@ -167,21 +167,12 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
 		}
 	      else
 		{
-		  /*
-		    fits_read_col(dSet->fp,TINT,colnum,
-		    subint+1,
-		    1+i*npol*nchan/samplesperbyte+polNum*nchan/samplesperbyte,
-		    nchan/samplesperbyte,
-		    &n_ival,iVals,&initflag,&status);
-		  */
-		  printf("In here\n");
 		  fits_read_col(dSet->fp,TFLOAT,colnum,
 				subint+1,
 				1+i*npol*nchan/samplesperbyte+polNum*nchan/samplesperbyte,
 				nchan/samplesperbyte,
 				&n_fval,fVals,&initflag,&status);
 
-		  //		  for (j=0;j<npol*nchan;j++)  // Is this really npol??
 		  if (offsScl==0)
 		    {
 		      for (j=0;j<nchan;j++)  // Is this really npol??
@@ -193,10 +184,9 @@ void pfits_read1pol_float(float *out,int polNum,dSetStruct *dSet,float t1,float 
 			out[scount*nchan+j]=fVals[j]*datScl[j]+datOffs[j];
 
 		    }
-		      //		    out[scount*nchan+j]=iVals[j];
-		  printf("Got here\n");
 		}
 	      scount++;
+	      
 	    }
 	}
       // Deallocate the memory
@@ -534,3 +524,6 @@ void convertStokes(float p1,float p2,float p3,float p4,float *stokesI,float *sto
   *stokesU = 2*p3;
   *stokesV = 2*p4;
 }
+
+/*
+ */

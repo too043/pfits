@@ -14,7 +14,7 @@
  * along with pfits.  If not, see <http://www.gnu.org/licenses/>. 
 */
 
-//gcc -lm -o pfits_getZeroDM pfits_getZeroDM.c pfits_setup.c pfits_loader.c -I/Users/hob044/hob044/software/cfitsio/include/ -L/Users/hob044/hob044/software/cfitsio/lib -lcfitsio -lfftw3
+//gcc -lm -o pfits_dumpValues pfits_dumpValues.c pfits_setup.c pfits_loader.c -I/Users/hob044/hob044/software/cfitsio/include/ -L/Users/hob044/hob044/software/cfitsio/lib -lcfitsio -lfftw3
 
 #include <stdio.h>
 #include <math.h>
@@ -33,7 +33,8 @@ int main(int argc,char *argv[])
   int i,j,k;
   float *data;
 
-  char outFile[128]="zeroDM.dat";
+  char outFile[128]="dumpValues";
+  char oName[1024];
   FILE *fout;
   int subint;
   long nSamples;
@@ -146,124 +147,23 @@ int main(int argc,char *argv[])
   
   totCount=0;
 
-  fout = fopen(outFile,"w");
 
-  if (fft==1)
-    {
-      in_vals = (double *)malloc(sizeof(double)*dSet->head->nsblk*dSet->head->nsub);
-    }
+  fout = fopen(outFile,"wb");
 
-  nc=0;
   for (subint=sub0;subint<sub1;subint++)
-    {
-      printf("Subint %d/%d\n",subint,sub1);
+    {	  
       pfits_read1pol_float(data,pol,dSet,subint,subint,1,&nSamples,&nTime,&nFreq,debug,sclOff);
-      for (j=0;j<nTime;j+=tAv)
+      for (j=0;j<nTime;j++)
 	{
-	  sum1=0;
-	  n=0;
-	  for (k=j;k<j+tAv;k++)
-	    {
-	      if (k < nTime)
-		{
-		  for (i=0;i<dSet->head->nchan;i++)
-		    {
-		      //		      if (chbw > 0)
-			{
-			  if ((i >= i0 && i <= i1)) 
-			    {
-			      sum1 += data[k*nFreq+i];
-			      n++;
-			    }
-			}
-			/*
-			else
-			{
-			  if ((i <= i0 && i >= i1)) 
-			    {
-			      sum1 += data[k*nFreq+i];
-			      n++;
-			    }
-			    } */
-			
-		    }
-		  totCount++;
-		  
-		}	      
-	    }
-	  if (fft==1)
-	    {
-	      mean+=sum1/(double)n;
-	      in_vals[nc]=sum1/(double)n;
-	    }
-	  fprintf(fout,"%d %g %g %g %d %g %d %d\n",totCount,totCount*dSet->head->tsamp,sum1/(double)n,sum1,n,chbw,i0,i1);
-	  nc++;
+	  fwrite(data+j*dSet->head->nchan,sizeof(float),dSet->head->nchan,fout);
 	}
     }
   fclose(fout);
 
-  if (fft==1)
-    {
-      double freq;
-      double scale;
 
-      mean/=(double)nc;
-      output = (fftw_complex *)fftw_malloc(sizeof(fftw_complex)*nc);
-      printf("Allocation = %ld %d %d\n",(long)(dSet->head->nsblk*dSet->head->nsub),dSet->head->nsblk,dSet->head->nsub);
-      printf("FFT n = %d\n",nc);
-      for (i=0;i<nc;i++)
-	in_vals[i]-=mean;
-      printf("Removed mean\n");
-      transform_plan = fftw_plan_dft_r2c_1d(nc,in_vals,output,FFTW_ESTIMATE);
-      printf("Running fft\n");
-      fftw_execute(transform_plan);
-      printf("Complete running fft\n");
-      fout = fopen("fft.dat","w");
-      for (i=0;i<nc/2;i++)
-	{
-	  freq = (double)i/((sub1-sub0)*dSet->head->nsblk*dSet->head->tsamp);
-	  scale = ((sub1-sub0)*dSet->head->nsblk*dSet->head->tsamp)/pow(nc,2);
-	  fprintf(fout,"%g %g %g %g\n",freq,scale*(pow(output[i][0],2)+pow(output[i][1],2)),
-		  log10(freq),log10(scale*(pow(output[i][0],2)+pow(output[i][1],2))));
-	}
-      fclose(fout);
 
-      fout = fopen("fft.bin.dat","w");
-      if (binFFT == 1)
-	{
-	  int nbin = 20;
-	  double lf0,lf1;
-	  double bvalX,bvalY;
-	  unsigned long nv;
-	  
-	  for (j=0;j<nbin;j++)
-	    {
-	      lf0 = -3+(double)(7.0*j)/(double)(nbin);
-	      lf1 = -3+(double)(7.0*(j+1))/(double)(nbin);
-	      bvalX=0;
-	      bvalY=0;
-	      nv=0;
-	      for (i=0;i<nc/2;i++)
-		{
-		  freq = (double)i/((sub1-sub0)*dSet->head->nsblk*dSet->head->tsamp);
-		  //		  printf("freq = %g %g\n",freq,lf0,lf1);
-		  if (log10(freq) >= lf0 && log10(freq) < lf1)
-		    {
-		      bvalX += freq;
-		      bvalY += (pow(output[i][0],2)+pow(output[i][1],2))*((sub1-sub0)*dSet->head->nsblk*dSet->head->tsamp)/pow(nc,2);
-		      nv++;		      
-		    }
-		}
-
-	      fprintf(fout,"%g %g %g %g\n",lf0,lf1,bvalX/(double)nv,bvalY/(double)nv);
-	    }
-	}
-      fclose(fout);
-
-      free(in_vals);
-      free(output);
-    }
   
+
   free(data);
   // De-allocate the memory
   deallocateMemory(&dSet,debug);
