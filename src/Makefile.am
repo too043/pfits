@@ -1,3 +1,4 @@
+LIBS = -lerfa -lcalceph
 
 noinst_LTLIBRARIES = libpfits.la
 
@@ -22,12 +23,13 @@ bin_PROGRAMS = fitsProcess \
   pfitsUtil_searchmode_filter \
   pfitsUtil_createFoldTemplate
 
-LDADD = libpfits.la @CFITSIO_LIBS@ @FFTW_LIBS@
+LDADD = $(LIBS) libpfits.la @CFITSIO_LIBS@ @FFTW_LIBS@
 
 if HAVE_PGPLOT
 
   bin_PROGRAMS += pfits_plot \
     pfits_plot \
+    pfits_plotFold \
     pfits_zapProfile \
     pfits_zapUWL \
     pfits_zapUWL_auto \
@@ -41,7 +43,7 @@ if HAVE_PGPLOT
     pfits_cal \
     pfits_change \
     pfits_dedisperse \
-    pfits_describe \
+  	pfits_describe \
     pfits_extract1bit \
     pfits_fftSearch \
     pfits_fluxcal \
@@ -61,6 +63,7 @@ if HAVE_PGPLOT
     pfits_checkRandom
 
   pfits_plot_SOURCES = pfits_plot.c pfits_setup.c pfits_loader.c
+  pfits_plotFold_SOURCES = pfits_plotFold.c pfits_setup.c pfits_loader.c
   pfits_zapProfile_SOURCES = pfits_zapProfile.c pfits_setup.c 
   pfits_zapUWL_SOURCES = pfits_zapUWL.c pfits_setup.c 
   pfits_zapUWL_auto_SOURCES = pfits_zapUWL_auto.c pfits_setup.c 
