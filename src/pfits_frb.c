@@ -102,9 +102,9 @@ int main(int argc,char *argv[])
 	flip=1;
       else if (strcmp(argv[i],"-frb")==0)
 	sscanf(argv[++i],"%f",&frbTime);
-      else if (strcmp(argv[i],"-w1")==0)
+      else if (strcmp(argv[i],"-w1")==0) // This is the width of the final plot
 	sscanf(argv[++i],"%f",&tdispWidth);
-      else if (strcmp(argv[i],"-w2")==0)
+      else if (strcmp(argv[i],"-w2")==0) // This is the data window that gets loaded in
 	sscanf(argv[++i],"%f",&plotWidth);
       else if (strcmp(argv[i],"-nbin")==0)
 	sscanf(argv[++i],"%d",&nbin);
@@ -256,7 +256,6 @@ int main(int argc,char *argv[])
 	  cpglab("Time from start of observation (s)","","");
 	}
       
-      printf("GEORGE\n");
       printf("Using %d %d\n",nchan,nTimeSamples);
       if (colourScheme==0)
 	{
@@ -343,7 +342,8 @@ int main(int argc,char *argv[])
 	      if (maxy < sumSigY[i]) maxy = sumSigY[i];
 	    }
 	}
-      printf("GOT HERE AAA\n");     
+      //
+      // Plotting the profile at the top
       cpgsvp(0.1,0.9,0.75,0.9);
       cpgswin(tdispCentre-tdispWidth/2.,tdispCentre+tdispWidth/2.,miny,maxy+(maxy-miny)*0.1);
       cpgbox("ABCTS",0,0,"ABCTS",0,0);
@@ -372,8 +372,8 @@ int main(int argc,char *argv[])
 	  tr[2] = dSet->head->tsamp*nbin;
 	  tr[3] = dSet->head->chanFreq[0];  tr[4] = dSet->head->chanbw;  tr[5] = 0;
 	  
-	  
-	  cpgimag(plotArrBin,nchan,nTimeSamples/2,1,nchan,1,nTimeSamples/2,minVal,maxVal,tr);
+	  cpgimag(plotArr,nchan,nTimeSamples,1,nchan,1,nTimeSamples,minVal,maxVal,tr);
+	  //	  cpgimag(plotArrBin,nchan,nTimeSamples/2,1,nchan,1,nTimeSamples/2,minVal,maxVal,tr);
 	}
     }
   else
@@ -409,6 +409,7 @@ int main(int argc,char *argv[])
 
       //      cpgctab(heat_l,heat_r,heat_g,heat_b,5,1.0,0.5);
       printf("Using %d %d\n",nchan,nTimeSamples);
+      // Top left plot - shows the dispersed pulse on a 2-D freq-time plot
       cpgimag(plotArr,nchan,nTimeSamples,1,nchan,1,nTimeSamples,minVal,maxVal,tr);
       if (outputSet==1)
 	{
@@ -468,14 +469,15 @@ int main(int argc,char *argv[])
       tr[2] = dSet->head->tsamp*nbin;
       tr[3] = dSet->head->chanFreq[0];  tr[4] = dSet->head->chanbw;  tr[5] = 0;
       //  cpgsvp(0.1,0.7,0.15,0.54);
+
+      // This is the bottom left plot
       cpgsvp(0.05,0.45,0.15,0.54);
       cpgswin(t1,t2,tr[3],tr[3]+nchan*tr[4]);
       cpgbox("ABCTSN",0,0,"ABCTSN",0,0);
       cpglab("Time from start of observation (s)","Frequency (MHz)","");
       //      cpgctab(heat_l,heat_r,heat_g,heat_b,5,1.0,0.5);
       printf("Using %d %d\n",nchan,nTimeSamples/2);
-      cpgimag(plotArrBin,nchan,nTimeSamples/2,1,nchan,1,nTimeSamples/2,minVal,maxVal,tr);
-      
+      cpgimag(plotArrBin,nchan,nTimeSamples/nbin,1,nchan,1,nTimeSamples/nbin,minVal,maxVal,tr);
       // Overlay FRB analytic signal
       tdiff = 4.15e-3*dm*(pow(fref/1000.0,-2)-pow(dSet->head->chanFreq[0]/1000.0,-2));
       tdispCentre = frbTime + tdiff;
