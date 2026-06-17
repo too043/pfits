@@ -1,5 +1,5 @@
 // Code to extract one or more frequency bands from a specified PSRFITS file
-
+// gcc -lm -o pfitsUtil_foldmode_extractFreq pfitsUtil_foldmode_extractFreq.c -lcfitsio
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -45,7 +45,7 @@ int main(int argc,char *argv[])
   int writePos;
   int readPos;
 
-  long naxes[4];
+   long naxes[4];
   int naxis=3;
   char tdim[16];
   float freq1,freq2;
@@ -112,6 +112,10 @@ int main(int argc,char *argv[])
       fits_read_col(infptr,TFLOAT,colnum_in_datFreq,1,1,nchan,&nullVal_f,freq,&initflag,&status);
       if (freq[0] < freq[1])
 	{
+	  printf("Checking f1/f2 = %g/%g\n",freq1,freq2);
+	  if (freq1 < freq[0])
+	    outChan1=0;
+	  
 	  for (i=0;i<nchan-1;i++)
 	    {
 	      if (freq1 > freq[i] && freq1 <= freq[i+1])
